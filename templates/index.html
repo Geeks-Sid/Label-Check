@@ -603,5 +603,22 @@
             </div>
         </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const completeCheckbox = document.getElementById('complete');
+            const nextButton = document.querySelector('button[name="action"][value="next"]');
+
+            function toggleNextButtonState() {
+                // Disable the 'Next' button if the 'Mark as Complete' checkbox is not checked
+                nextButton.disabled = !completeCheckbox.checked;
+            }
+
+            // Set the initial state of the 'Next' button when the page loads
+            toggleNextButtonState();
+
+            // Add a listener to the checkbox to toggle the button state whenever it changes
+            completeCheckbox.addEventListener('change', toggleNextButtonState);
+        });
+    </script>
 </body>
 </html>

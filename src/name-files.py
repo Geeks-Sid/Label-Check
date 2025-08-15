@@ -76,8 +76,8 @@ accession_pattern = re.compile(rf"{reg_name}[- ]\d+", re.IGNORECASE)
 # File paths (adjust as necessary)
 # -----------------------------------------------------------------------------
 # Use raw strings (r"...") or forward slashes for Windows paths
-input_filename = r"/Users/siddheshthakur/Work/Projects/Label-Check/2025-07-20/output-ocr-2025-07-20.csv"
-output_filename = r"/Users/siddheshthakur/Work/Projects/Label-Check/2025-07-20/output_processed_latest.csv"
+input_filename = "Data/combined_data_ocr.csv"
+output_filename = "Data/combined_data_ocr_processed.csv"
 
 # -----------------------------------------------------------------------------
 # Main processing function
