@@ -1,22 +1,33 @@
+import argparse
 import csv
-import re
 import logging
+import re
+from pathlib import Path
+from typing import Dict, List, Tuple
+
+from tqdm import tqdm
 
 # -----------------------------------------------------------------------------
-# Logging configuration
+# Logging Configuration
 # -----------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
-# Configuration & Regex patterns
+# Configuration & Constants
 # -----------------------------------------------------------------------------
-# Mapping dictionary for canonical stain names to common spelling mistakes/variations
-stain_name_corrections = {
+# Names for the new columns to be added to the CSV
+COL_ACCESSION_ID = "AccessionID"
+COL_STAIN = "Stain"
+COL_EXTRACTION_SUCCESSFUL = "ExtractionSuccessful"
+COL_QC_PASSED = "QCPassed"
+
+# Mapping for stain name corrections. This could also be loaded from a JSON/YAML file.
+STAIN_NAME_CORRECTIONS = {
     "H&E": ["H and E", "H+E", "H-E", "HBE", "H8E", "#&E", "HnE", "H8E", "HnBE", "H&E"],
     "TPREP": ["T-PREP", "TPREP", "T PREP", "TP-REP", "TPREP."],
     "IDH": ["IDH1", "IDH-1", "IDHl", "lDH", "IDH.", "IDH"],
@@ -49,117 +60,175 @@ stain_name_corrections = {
     "ALK": ["A-LK", "ALK", "ALK.", "A-LK."],
 }
 
-# --- Create regex pattern and normalization map for stains ---
-all_stain_variations = set()
-variation_to_canonical_map = {}
-
-for canonical_name, variations in stain_name_corrections.items():
-    # Ensure the canonical name itself is included as a variation
-    # Use a set to automatically handle duplicates if canonical name is also in list
-    current_variations = set(variations)
-    current_variations.add(canonical_name)
-
-    all_stain_variations.update(current_variations)
-    for variation in current_variations:
-        # Map the lowercase version of the variation to the canonical name
-        variation_to_canonical_map[variation.lower()] = canonical_name
-
-# Escape variations for regex and join with OR '|'
-stain_pattern_str = "|".join(re.escape(name) for name in all_stain_variations)
-stain_pattern = re.compile(stain_pattern_str, re.IGNORECASE)
-
-# --- Pattern to extract accession ID ---
-reg_name = "S"
-accession_pattern = re.compile(rf"{reg_name}[- ]\d+", re.IGNORECASE)
-
 # -----------------------------------------------------------------------------
-# File paths (adjust as necessary)
+# Core Functions
 # -----------------------------------------------------------------------------
-# Use raw strings (r"...") or forward slashes for Windows paths
-input_filename = "Data/combined_data_ocr.csv"
-output_filename = "Data/combined_data_ocr_processed.csv"
 
-# -----------------------------------------------------------------------------
-# Main processing function
-# -----------------------------------------------------------------------------
-def process_csv(input_file: str, output_file: str):
+
+def build_stain_normalizer(
+    corrections: Dict[str, List[str]],
+) -> Tuple[re.Pattern, Dict[str, str]]:
+    """Builds a regex pattern and a lookup map for normalizing stain names."""
+    variation_lookup = {}
+    all_variations = set()
+
+    for canonical, variations in corrections.items():
+        # Ensure the canonical name is part of the variations set
+        current_variations = set(v.lower() for v in variations)
+        current_variations.add(canonical.lower())
+
+        all_variations.update(current_variations)
+        for var in current_variations:
+            variation_lookup[var] = canonical
+
+    # Sort by length descending to match longer variations first (e.g., "H&E" before "H")
+    sorted_variations = sorted(list(all_variations), key=len, reverse=True)
+    pattern_str = "|".join(re.escape(var) for var in sorted_variations)
+    pattern = re.compile(pattern_str, re.IGNORECASE)
+
+    return pattern, variation_lookup
+
+
+def process_row(
+    row: List[str],
+    accession_pattern: re.Pattern,
+    stain_pattern: re.Pattern,
+    stain_lookup: Dict[str, str],
+) -> Dict[str, any]:
     """
-    Reads a CSV file, extracts Accession ID and Stain Name from each row,
-    normalizes the stain name, and writes the results to an output CSV file.
+    Processes a single CSV row to find and normalize accession ID and stain.
+
+    Returns:
+        A dictionary with the extracted and processed data.
     """
-    logger.info("Starting CSV processing from '%s' to '%s'", input_file, output_file)
-    processed_lines = 0
-    found_both_count = 0
+    accession_id = None
+    canonical_stain = None
+
+    # Join the row into a single string for a comprehensive search
+    # This handles cases where an ID or stain is split across cells
+    full_row_text = ";".join(str(field) for field in row if field)
+
+    # 1. Find Accession ID
+    accession_match = accession_pattern.search(full_row_text)
+    if accession_match:
+        accession_id = accession_match.group(0).replace(" ", "-").upper()
+
+    # 2. Find Stain Name
+    stain_match = stain_pattern.search(full_row_text)
+    if stain_match:
+        found_variation = stain_match.group(0).lower()
+        canonical_stain = stain_lookup.get(found_variation, found_variation)
+
+    return {
+        COL_ACCESSION_ID: accession_id,
+        COL_STAIN: canonical_stain,
+        COL_EXTRACTION_SUCCESSFUL: bool(accession_id and canonical_stain),
+    }
+
+
+def enrich_csv_data(input_path: Path, output_path: Path, delimiter: str = ";"):
+    """
+    Reads a CSV, enriches it with extracted data, and saves it to a new file.
+    """
+    if not input_path.exists():
+        logger.error(f"Input file not found: {input_path}")
+        return
+
+    logger.info("Building regex patterns for extraction...")
+    # --- Pattern to extract accession ID ---
+    reg_name = "S"
+    accession_pattern = re.compile(rf"{reg_name}[- ]\d+", re.IGNORECASE)
+    stain_pattern, stain_lookup = build_stain_normalizer(STAIN_NAME_CORRECTIONS)
+
+    logger.info(f"Starting CSV enrichment from '{input_path}' to '{output_path}'")
 
     try:
-        with open(input_file, mode='r', newline='', encoding="utf-8", errors='replace') as infile, \
-            open(output_file, mode='w', newline='', encoding="utf-8") as outfile:
+        # First, count rows for the progress bar
+        with open(input_path, mode="r", encoding="utf-8", errors="replace") as f:
+            total_rows = sum(1 for row in f) - 1  # Subtract header
 
-            reader = csv.reader(infile, delimiter=';')
-            writer = csv.writer(outfile, delimiter=';')
+        with (
+            open(
+                input_path, mode="r", newline="", encoding="utf-8", errors="replace"
+            ) as infile,
+            open(output_path, mode="w", newline="", encoding="utf-8") as outfile,
+        ):
+            reader = csv.reader(infile, delimiter=delimiter)
+            writer = csv.writer(outfile, delimiter=delimiter)
 
-            # Write header row for the output CSV
-            writer.writerow(["AccessionID", "Stain", "Complete", "OriginalLine"])
+            # Read original header and create the new, enriched header
+            header = next(reader)
+            new_header = header + [
+                COL_ACCESSION_ID,
+                COL_STAIN,
+                COL_EXTRACTION_SUCCESSFUL,
+                COL_QC_PASSED,
+            ]
+            writer.writerow(new_header)
 
-            for i, row in enumerate(reader):
-                # Reassemble the original CSV line (useful for debugging or later reference)
-                # Handle potential None values in row if reader yields them (unlikely but safe)
-                original_line = ";".join(str(field) if field is not None else "" for field in row)
-                accession_id = None
-                found_stain_variation = None
-                canonical_stain = None
+            successful_extractions = 0
 
-                # Look through every field to gather target substring data.
-                for field in row:
-                    # Ensure field is a string before searching
-                    if not isinstance(field, str):
-                        continue
+            # Use tqdm for a progress bar
+            for row in tqdm(reader, total=total_rows, desc="Processing rows"):
+                extracted_data = process_row(
+                    row, accession_pattern, stain_pattern, stain_lookup
+                )
 
-                    # Search for Accession ID if not already found
-                    if accession_id is None:
-                        match_accession = accession_pattern.search(field)
-                        if match_accession:
-                            accession_id = match_accession.group(0).replace(" ", "-").upper() # Normalize spacing and case
-                            # Optional: remove leading/trailing spaces if needed: accession_id = accession_id.strip()
+                if extracted_data[COL_EXTRACTION_SUCCESSFUL]:
+                    successful_extractions += 1
 
+                # Create the new row by appending extracted data
+                output_row = row + [
+                    extracted_data[COL_ACCESSION_ID] or "",
+                    extracted_data[COL_STAIN] or "",
+                    extracted_data[COL_EXTRACTION_SUCCESSFUL],
+                    "",  # Leave QCPassed column empty for manual review
+                ]
+                writer.writerow(output_row)
 
-                    # Search for Stain Name if not already found
-                    if found_stain_variation is None:
-                        match_stain = stain_pattern.search(field)
-                        if match_stain:
-                            found_stain_variation = match_stain.group(0)
-                            # Normalize the found stain variation to its canonical form
-                            canonical_stain = variation_to_canonical_map.get(found_stain_variation.lower(), found_stain_variation) # Fallback to original if somehow not in map
+        logger.info("CSV enrichment complete.")
+        logger.info(f"Processed {total_rows} data rows.")
+        logger.info(
+            f"Successfully extracted both ID and Stain in {successful_extractions} rows."
+        )
 
-                    # Optimization: Stop searching fields in this row if both are found
-                    if accession_id and canonical_stain:
-                        break
-
-                # Determine completeness
-                complete = bool(accession_id and canonical_stain)
-                if complete:
-                    found_both_count += 1
-
-                # Log the details of processing at INFO level
-                # Use the canonical_stain for logging
-                logger.info("Processed line %d - AccessionID: %s, Stain: %s (Found as: %s), Complete: %s",
-                            i + 1, accession_id, canonical_stain, found_stain_variation, complete)
-
-                # Write results to output CSV
-                # Use the canonical_stain in the output
-                writer.writerow([accession_id or "", canonical_stain or "", complete, original_line])
-                processed_lines += 1
-
-        logger.info("Finished CSV processing. Processed %d lines.", processed_lines)
-        logger.info("Found both Accession ID and Stain in %d lines.", found_both_count)
-
-    except FileNotFoundError:
-        logger.error("Error: Input file not found at '%s'", input_file)
     except Exception as e:
-        logger.exception("An unexpected error occurred during CSV processing: %s", e)
+        logger.exception(f"An unexpected error occurred: {e}")
+
 
 # -----------------------------------------------------------------------------
-# Script execution
+# Script Execution
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
-    process_csv(input_filename, output_filename)
+    parser = argparse.ArgumentParser(
+        description="Extracts Accession ID and Stain Name from a CSV, normalizes them, "
+        "and appends the results as new columns to the original data."
+    )
+    parser.add_argument(
+        "-i",
+        "--input-file",
+        type=Path,
+        required=True,
+        help="Path to the input CSV file.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output-file",
+        type=Path,
+        required=True,
+        help="Path for the enriched output CSV file.",
+    )
+    parser.add_argument(
+        "-d",
+        "--delimiter",
+        type=str,
+        default=";",
+        help="Delimiter used in the CSV file (default: ';').",
+    )
+
+    args = parser.parse_args()
+
+    # Ensure the output directory exists
+    args.output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    enrich_csv_data(args.input_file, args.output_file, args.delimiter)
