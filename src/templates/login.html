@@ -154,7 +154,7 @@
         </form>
         <ul class="flash-messages">
             {% for message in messages %}
-                <li class="{{ message.css_class }}">{{ message.message }}</li>
+                <li class="{{ message.category }}">{{ message.message }}</li>
             {% endfor %}
         </ul>
     </div>

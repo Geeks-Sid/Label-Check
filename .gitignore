@@ -213,3 +213,16 @@ Data/*
 Archive/
 sorted/
 logs/
+
+backend/node_modules/
+NP-*
+*csv8
+*/*csv*
+NP-22-data/*
+NP-23-data/*
+NP-*.*
+.gitignore
+src/audit_logs/*
+src/ocr_audit_logs/
+docker-compose.yml
+tests/
