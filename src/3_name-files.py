@@ -236,7 +236,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--accession-pattern",
         type=str,
-        default=r"[A-Z]{1,4}\d{0,2}[- ]\d+",
+        default=r"\b(NP\s*\d+\s*-\s*\d+)\b",
         help="Regex pattern to extract the Accession ID. "
         "Default matches formats like 'S-12345' and 'NP22-950'.",
     )
