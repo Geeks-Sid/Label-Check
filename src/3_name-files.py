@@ -1,3 +1,28 @@
+"""
+This script is the third and final step in a data processing pipeline for whole-slide images (WSIs).
+It takes a CSV file enriched with OCR text (from the second script) and performs the final
+data extraction and normalization.
+
+The primary goals of this script are:
+1.  **Parse OCR Text:** Use regular expressions (regex) to find and extract critical information,
+    specifically the Accession ID and the Stain type, from the combined OCR text of the label
+    and macro images.
+2.  **Normalize Data:** Standardize the extracted data. Accession IDs are formatted consistently
+    (e.g., 'NP 22-950' becomes 'NP22-950'), and various OCR misreadings of stain names
+    (e.g., "H and E", "H+E") are mapped to a single canonical name ("H&E").
+3.  **Enrich the CSV:** Append the parsed and normalized data as new columns to the CSV.
+    It also adds flags indicating whether the parsing was successful and a column for
+    manual quality control in a subsequent review tool.
+4.  **Process Efficiently:** The script uses a thread pool for parallel processing, making it
+    fast even with a large number of rows.
+
+The final output is a clean, structured CSV file ready for use in a database or a manual
+review application.
+"""
+
+# -----------------------------------------------------------------------------
+# 1. IMPORTS
+# -----------------------------------------------------------------------------
 import argparse
 import csv
 import logging
@@ -6,11 +31,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from tqdm import tqdm
+from tqdm import tqdm  # For displaying a progress bar
 
 # -----------------------------------------------------------------------------
-# Logging Configuration
+# 2. Logging Configuration
 # -----------------------------------------------------------------------------
+# Set up a logger for informative console output with timestamps.
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -19,17 +45,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
-# Configuration & Constants
+# 3. Configuration & Constants
 # -----------------------------------------------------------------------------
-# Names for the new columns to be added to the CSV
+# Define the names for the new columns that will be added to the output CSV.
 COL_ACCESSION_ID = "AccessionID"
 COL_STAIN = "Stain"
 COL_EXTRACTION_SUCCESSFUL = "ExtractionSuccessful"
-COL_QC_PASSED = "ParsingQCPassed"  # Renamed for clarity vs ocr_qc_needed
+# This column is added for compatibility with the manual review tool. It starts empty.
+COL_QC_PASSED = "ParsingQCPassed"
 
-# Mapping for stain name corrections. This could also be loaded from a JSON/YAML file.
-
-# Mapping for stain name corrections. This could also be loaded from a JSON/YAML file.
+# A comprehensive dictionary to correct common OCR errors and variations for stain names.
+# The key is the "canonical" (standard) name, and the value is a list of all known
+# variations that should be mapped to it. This can be easily extended or moved to an
+# external config file (like JSON) for easier management.
 STAIN_NAME_CORRECTIONS = {
     "H&E": ["H and E", "H+E", "H-E", "HBE", "H8E", "#&E", "HnE", "H8E", "HnBE", "H&E"],
     "TPREP": ["T-PREP", "TPREP", "T PREP", "TP-REP", "TPREP."],
@@ -65,25 +93,48 @@ STAIN_NAME_CORRECTIONS = {
 
 
 # -----------------------------------------------------------------------------
-# Core Functions
+# 4. Core Functions
 # -----------------------------------------------------------------------------
 def build_stain_normalizer(
     corrections: Dict[str, List[str]],
 ) -> Tuple[re.Pattern, Dict[str, str]]:
-    """Builds a regex pattern and a lookup map for normalizing stain names."""
+    """
+    Builds a regex pattern and a lookup map for efficient stain name normalization.
+
+    This function preprocesses the `STAIN_NAME_CORRECTIONS` dictionary to create two
+    optimized data structures:
+    1. A compiled regex pattern that can find any of the known stain variations in text.
+    2. A lookup dictionary that maps any lowercase variation directly to its canonical form.
+
+    Args:
+        corrections (Dict[str, List[str]]): The dictionary of stain name corrections.
+
+    Returns:
+        Tuple[re.Pattern, Dict[str, str]]: A tuple containing the compiled regex
+                                           pattern and the variation-to-canonical lookup map.
+    """
     variation_lookup = {}
     all_variations = set()
 
+    # Create a reverse mapping from any variation to its canonical name.
     for canonical, variations in corrections.items():
+        # Use a set for efficient addition and to handle duplicates.
         current_variations = {v.lower() for v in variations}
-        current_variations.add(canonical.lower())
+        current_variations.add(canonical.lower())  # Add the canonical name itself as a variation.
         all_variations.update(current_variations)
         for var in current_variations:
             variation_lookup[var] = canonical
 
+    # Sort variations by length in descending order. This is a crucial optimization for the
+    # regex. It ensures that longer matches (e.g., "H3 K27M") are found before shorter
+    # substrings (e.g., "H3"), preventing incorrect partial matches.
     sorted_variations = sorted(list(all_variations), key=len, reverse=True)
+
+    # Join all variations into a single regex "OR" pattern (e.g., 'h-e|h\+e|h&e').
+    # re.escape() is used to handle special characters like '+' correctly.
     pattern_str = "|".join(re.escape(var) for var in sorted_variations)
     pattern = re.compile(pattern_str, re.IGNORECASE)
+
     return pattern, variation_lookup
 
 
@@ -94,30 +145,46 @@ def process_csv_row(
     stain_lookup: Dict[str, str],
 ) -> Dict[str, any]:
     """
-    Processes a single CSV row dictionary to find and normalize accession ID and stain.
+
+    Processes a single CSV row to find, extract, and normalize the accession ID and stain.
+
+    This is the core worker function that is executed in parallel for each row of the CSV.
+
+    Args:
+        row (Dict[str, str]): A dictionary representing a single row from the input CSV.
+        accession_pattern (re.Pattern): The compiled regex for finding accession IDs.
+        stain_pattern (re.Pattern): The compiled regex for finding stain names.
+        stain_lookup (Dict[str, str]): The map to convert a found stain variation to its canonical name.
+
+    Returns:
+        Dict[str, any]: The original row dictionary, updated with the new parsed columns.
     """
     updated_row = row.copy()
     accession_id = None
     canonical_stain = None
 
+    # Combine the OCR text from both label and macro images into a single string for searching.
     search_text = f"{row.get('label_text', '')} {row.get('macro_text', '')}"
 
-    # 1. Find Accession ID
+    # --- Step 1: Find and Normalize the Accession ID ---
     accession_match = accession_pattern.search(search_text)
     if accession_match:
-        # Normalize the found ID: uppercase and use hyphens
+        # If a match is found, normalize it to a standard format (uppercase, hyphens, no spaces).
         accession_id = accession_match.group(0).replace(" ", "-").upper()
 
-    # 2. Find Stain Name
+    # --- Step 2: Find and Normalize the Stain Name ---
     stain_match = stain_pattern.search(search_text)
     if stain_match:
         found_variation = stain_match.group(0).lower()
+        # Use the pre-built lookup map to get the canonical name.
         canonical_stain = stain_lookup.get(found_variation, found_variation)
 
-    # 3. Add the new data to the row
+    # --- Step 3: Add the new data to the row dictionary ---
     updated_row[COL_ACCESSION_ID] = accession_id
     updated_row[COL_STAIN] = canonical_stain
+    # The extraction is considered successful only if BOTH an ID and a stain were found.
     updated_row[COL_EXTRACTION_SUCCESSFUL] = bool(accession_id and canonical_stain)
+    # Initialize the QC_PASSED column as empty.
     updated_row[COL_QC_PASSED] = ""
 
     return updated_row
@@ -127,26 +194,33 @@ def enrich_csv_with_parsing(
     input_path: Path, output_path: Path, accession_pattern_str: str, num_workers: int
 ):
     """
-    Reads a CSV, enriches it with extracted data in parallel, and saves it.
+    Orchestrates the entire CSV enrichment process: reads the input, processes rows
+    in parallel, and saves the final enriched CSV.
+
+    Args:
+        input_path (Path): Path to the input CSV file containing OCR text.
+        output_path (Path): Path where the final, enriched CSV will be saved.
+        accession_pattern_str (str): The regex pattern string for finding accession IDs.
+        num_workers (int): The number of concurrent threads to use for processing.
     """
     if not input_path.exists():
         logger.error(f"Input file not found: {input_path}")
         return
 
-    logger.info("Building regex patterns for extraction...")
+    logger.info("Building regex patterns for data extraction...")
     try:
-        # *** CHANGE: Compile the flexible pattern provided by the user ***
+        # Compile the user-provided regex for accession IDs.
         accession_pattern = re.compile(accession_pattern_str, re.IGNORECASE)
         logger.info(f"Using accession pattern: {accession_pattern_str}")
     except re.error as e:
-        logger.error(
-            f"Invalid regex pattern for accession ID: '{accession_pattern_str}'. Error: {e}"
-        )
+        logger.error(f"Invalid regex pattern for accession ID: '{accession_pattern_str}'. Error: {e}")
         return
 
+    # Build the optimized stain pattern and lookup map.
     stain_pattern, stain_lookup = build_stain_normalizer(STAIN_NAME_CORRECTIONS)
 
     try:
+        # Read the entire input CSV into memory.
         with open(input_path, mode="r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             original_rows = list(reader)
@@ -159,12 +233,12 @@ def enrich_csv_with_parsing(
         logger.warning("Input CSV is empty. No data to process.")
         return
 
-    logger.info(
-        f"Starting CSV enrichment for {len(original_rows)} rows using {num_workers} workers."
-    )
+    logger.info(f"Starting CSV enrichment for {len(original_rows)} rows using {num_workers} workers.")
 
+    # Process all rows in parallel using a thread pool.
     updated_rows = []
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
+        # Schedule the processing of each row.
         future_to_row = {
             executor.submit(
                 process_csv_row, row, accession_pattern, stain_pattern, stain_lookup
@@ -172,19 +246,20 @@ def enrich_csv_with_parsing(
             for row in original_rows
         }
 
-        progress = tqdm(
-            as_completed(future_to_row), total=len(original_rows), desc="Parsing rows"
-        )
+        # Create a progress bar that updates as each row's processing completes.
+        progress = tqdm(as_completed(future_to_row), total=len(original_rows), desc="Parsing rows")
         for future in progress:
             try:
+                # Collect the result (the updated row) from the completed future.
                 updated_rows.append(future.result())
             except Exception as e:
-                logger.error(f"A row failed to process: {e}")
+                logger.error(f"A row failed to process due to an unexpected error: {e}")
 
-    successful_extractions = sum(
-        1 for row in updated_rows if row[COL_EXTRACTION_SUCCESSFUL]
-    )
+    # Calculate summary statistics for logging.
+    successful_extractions = sum(1 for row in updated_rows if row[COL_EXTRACTION_SUCCESSFUL])
 
+    # Define the headers for the output CSV, ensuring new columns are added.
+    # `dict.fromkeys` is a trick to get unique headers while preserving order.
     new_headers = (original_headers or []) + [
         COL_ACCESSION_ID,
         COL_STAIN,
@@ -195,27 +270,26 @@ def enrich_csv_with_parsing(
 
     logger.info(f"Writing enriched data to '{output_path}'")
     try:
+        # Write the final list of updated rows to the output CSV file.
         with open(output_path, mode="w", newline="", encoding="utf-8") as outfile:
             writer = csv.DictWriter(outfile, fieldnames=final_headers)
             writer.writeheader()
             writer.writerows(updated_rows)
 
+        # Log a final summary of the operation.
         logger.info("CSV enrichment complete.")
-        logger.info(f"Processed {len(updated_rows)} data rows.")
-        logger.info(
-            f"Successfully extracted both ID and Stain in {successful_extractions} rows."
-        )
+        logger.info(f"Successfully processed {len(updated_rows)} data rows.")
+        logger.info(f"Successfully extracted both ID and Stain in {successful_extractions} rows ({successful_extractions / len(updated_rows):.2%}).")
 
     except Exception as e:
-        logger.exception(
-            f"An unexpected error occurred while writing the output file: {e}"
-        )
+        logger.exception(f"An unexpected error occurred while writing the output file: {e}")
 
 
 # -----------------------------------------------------------------------------
-# Script Execution
+# 5. Script Execution
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
+    # Set up the command-line interface for the script.
     parser = argparse.ArgumentParser(
         description="Extracts Accession ID and Stain from OCR text in a CSV, normalizes them, "
         "and appends the results as new columns."
@@ -224,7 +298,7 @@ if __name__ == "__main__":
         "--input-csv",
         type=Path,
         required=True,
-        help="Path to the input CSV file (e.g., 'mapping_with_ocr.csv').",
+        help="Path to the input CSV file enriched with OCR text.",
     )
     parser.add_argument(
         "--output-csv",
@@ -232,13 +306,14 @@ if __name__ == "__main__":
         required=True,
         help="Path for the final, enriched output CSV file.",
     )
-    # *** CHANGE: New, more powerful argument with a better default ***
     parser.add_argument(
         "--accession-pattern",
         type=str,
-        default=r"\b(NP\s*\d+\s*-\s*\d+)\b",
-        help="Regex pattern to extract the Accession ID. "
-        "Default matches formats like 'S-12345' and 'NP22-950'.",
+        # A robust default regex that matches formats like 'NP 22-950' or 'NP22-123'.
+        # \b ensures we match whole words only.
+        # \s* allows for zero or more spaces.
+        default=r"\b(NP\s*\d{2}\s*-\s*\d+)\b",
+        help="Regex pattern to extract the Accession ID.",
     )
     parser.add_argument(
         "--workers",
@@ -249,8 +324,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Ensure the output directory exists before writing the file.
     args.output_csv.parent.mkdir(parents=True, exist_ok=True)
 
+    # Run the main processing function with the provided arguments.
     enrich_csv_with_parsing(
         args.input_csv, args.output_csv, args.accession_pattern, args.workers
     )
