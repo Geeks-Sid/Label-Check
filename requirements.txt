@@ -1,0 +1,8 @@
+openslide-bin
+openslide-python
+tqdm
+opencv-python
+easyocr
+flask
+flask-login
+flask-sqlalchemy
