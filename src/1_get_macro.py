@@ -237,9 +237,8 @@ def process_slide_files(
                     else:
                         relative_paths[path_key] = ""  # Use an empty string if not found.
 
-                relative_paths["original_slide_path"] = (
-                    result["original"].relative_to(csv_parent_dir).as_posix()
-                )
+                relative_paths["original_slide_path"] = result["original"]
+
                 writer.writerow(relative_paths)
 
         logger.info(
@@ -302,13 +301,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Before starting, ensure the parent directory for the output CSV file exists.
-    args.csv_path.parent.mkdir(parents=True, exist_ok=True)
+    output_dir = Path(args.output_dir)
+    csv_path = output_dir / args.csv_path
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Call the main processing function with the parsed arguments.
     process_slide_files(
         args.input_dir,
-        args.output_dir,
-        args.csv_path,
+        output_dir,
+        csv_path,
         args.extensions,
         args.workers,
         tuple(args.thumbnail_size),  # Convert the list [w, h] to a tuple (w, h).
