@@ -59,7 +59,7 @@ COL_QC_PASSED = "ParsingQCPassed"
 # variations that should be mapped to it. This can be easily extended or moved to an
 # external config file (like JSON) for easier management.
 STAIN_NAME_CORRECTIONS = {
-    "H&E": ["H and E", "H+E", "H-E", "HBE", "H8E", "#&E", "HnE", "H8E", "HnBE", "H&E"],
+    "H&E": ["H and E", "H+E", "H-E", "HBE", "H8E", "#&E", "HnE", "H8E", "HnBE", "H&E", "HeE"],
     "TPREP": ["T-PREP", "TPREP", "T PREP", "TP-REP", "TPREP."],
     "IDH": ["IDH1", "IDH-1", "IDHl", "lDH", "IDH.", "IDH"],
     "ATRX": ["ATR-X", "ATRX", "ATR X", "ATRX.", "AT-RX"],
