@@ -210,8 +210,6 @@ def process_slide_files(
 
     # --- Write the results to a CSV file ---
     logger.info(f"Writing mapping to {csv_path}...")
-    # Get the parent directory of the CSV file to calculate relative paths from it.
-    csv_parent_dir = csv_path.parent
     try:
         # Open the CSV file for writing. `newline=''` prevents extra blank rows.
         with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
@@ -229,9 +227,7 @@ def process_slide_files(
                     path_key = f"{img_type}_path"
                     # Check if the image was successfully extracted (path is not None).
                     if result.get(img_type):
-                        # `relative_to` calculates the relative path.
-                        # `.as_posix()` ensures forward slashes are used, which is common for paths in text files.
-                        relative_paths[path_key] = csv_parent_dir / result[img_type]
+                        relative_paths[path_key] = result[img_type]
                     else:
                         relative_paths[path_key] = ""  # Use an empty string if not found.
 
