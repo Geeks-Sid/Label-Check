@@ -231,9 +231,7 @@ def process_slide_files(
                     if result.get(img_type):
                         # `relative_to` calculates the relative path.
                         # `.as_posix()` ensures forward slashes are used, which is common for paths in text files.
-                        relative_paths[path_key] = (
-                            result[img_type].relative_to(csv_parent_dir).as_posix()
-                        )
+                        relative_paths[path_key] = csv_parent_dir / result[img_type]
                     else:
                         relative_paths[path_key] = ""  # Use an empty string if not found.
 
