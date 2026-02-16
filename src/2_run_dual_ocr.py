@@ -70,15 +70,11 @@ def clean_and_resolve_path(path_str: str) -> Path | None:
     # 1. Standardize path separators to forward slashes, which work across platforms.
     cleaned_str = path_str.replace("\\", "/")
 
-    # 2. Remove any leading './' prefix, as this can interfere with path resolution
-    #    when the script's working directory differs from the file's location.
-    if cleaned_str.startswith("./"):
-        cleaned_str = cleaned_str[2:]
-
-    # 3. Create a Path object and use .resolve() to get the canonical, absolute path.
-    #    This is crucial for ensuring the script can find the images regardless of
-    #    where it is executed from.
-    return Path(cleaned_str).resolve()
+    # 2. Create a Path object
+    # WARNING: this assumes that cleaned_str is an absolute path, which should be the case
+    cleaned_path = Path(cleaned_str)
+    print(f"{cleaned_path}")
+    return Path(cleaned_str)
 
 
 def preprocess_image_for_ocr(image_np: np.ndarray) -> np.ndarray:
@@ -147,6 +143,8 @@ def perform_ocr_on_row(row: dict, csv_dir: Path, reader: easyocr.Reader) -> dict
         label_path = clean_and_resolve_path(label_path_str)
         if label_path and label_path.exists():
             paths_to_process["label"] = label_path
+            # Strip csv_dir from label_path for the flask app
+            updated_row["label_path"] = label_path.relative_to(csv_dir)
         else:
             logger.warning(f"Label image not found at resolved path '{label_path}' for row: {row}")
 
@@ -154,8 +152,14 @@ def perform_ocr_on_row(row: dict, csv_dir: Path, reader: easyocr.Reader) -> dict
         macro_path = clean_and_resolve_path(macro_path_str)
         if macro_path and macro_path.exists():
             paths_to_process["macro"] = macro_path
+            # Strip csv_dir from macro_path for the flask app
+            updated_row["macro_path"] = macro_path.relative_to(csv_dir)
         else:
             logger.warning(f"Macro image not found at resolved path '{macro_path}' for row: {row}")
+
+    # Also strip csv_dir from thumbnail_path for the flask app
+    thumbnail_path = clean_and_resolve_path(row.get("thumbnail_path"))
+    updated_row["thumbnail_path"] = thumbnail_path.relative_to(csv_dir)
 
     # Proceed only if at least one image file was found.
     if paths_to_process:
@@ -207,7 +211,7 @@ def perform_ocr_on_row(row: dict, csv_dir: Path, reader: easyocr.Reader) -> dict
     updated_row["label_text"] = label_text
     updated_row["macro_text"] = macro_text
     updated_row["ocr_qc_needed"] = ocr_qc_needed
-
+    
     return updated_row
 
 
