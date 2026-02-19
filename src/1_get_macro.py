@@ -253,13 +253,13 @@ if __name__ == "__main__":
     )
     # Define the command-line arguments.
     parser.add_argument(
-        "--input-dir",
+        "--input_dir",
         type=Path,
         required=True,
         help="Input directory containing slide files.",
     )
     parser.add_argument(
-        "--output-dir",
+        "--output_dir",
         type=Path,
         required=True,
         help="Output directory for extracted images.",

@@ -1,0 +1,142 @@
+import argparse
+import subprocess
+import shutil, os
+import webbrowser
+import time
+import platform
+from pathlib import Path
+
+def parse_except(e: Exception):
+    if e.returncode < 0:
+        print(f"Terminated by signal: {e}")
+    else:
+        match e.returncode:
+            case 1:
+                print(f"ERR -- general:\n\t{e.stderr}")
+            case 2:
+                print(f"ERR -- misuse of shell built-ins:\n\t{e.stderr}")
+            case 126:
+                print(f"ERR -- cannot execute command:\n\t{e.stderr}")
+            case 127:
+                print(f"ERR -- command not found:\n\t{e.stderr}")
+            case _:
+                print(f"ERR -- fatal error signal:\n\t{e.stderr}")
+
+
+def open_browser_wsl(url):
+    # Check if we are actually in WSL
+    if "microsoft-standard" in platform.uname().release.lower():
+        # Use PowerShell to 'Start' the URL on the Windows side
+        subprocess.run(["powershell.exe", "-Command", f"Start-Process '{url}'"])
+    else:
+        import webbrowser
+        webbrowser.open(url)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+            description="Pipeline for the separate modules inside of Label-Check. Streamlines the process to QC and handles argument passing between modules."
+    )
+    parser.add_argument(
+            "--input_dir", required=True, help="Input directory of images to be processed"
+    )
+    parser.add_argument(
+            "--output_dir", required=True, help="Output directory to place macros, labels, and thumbnails and wherein to conduct QC"
+    )
+    # create a config file for all of the other arguments, but these two must be provided at runtime
+    args = parser.parse_args()
+
+    input_dir = Path(args.input_dir)
+    output_dir = Path(args.output_dir)
+   
+    print("\x1b[1mExecuting 1_get_macro.py...\x1b[0m\n")
+    try:
+        subprocess.run(
+                [
+                    "python", 
+                    "src/1_get_macro.py", 
+                    "--input_dir", 
+                    input_dir, 
+                    "--output_dir", 
+                    output_dir
+                ], 
+                check=True, 
+                text=True
+        )
+    except Exception as e:
+        parse_except(e)
+
+    
+    mapping_csv = output_dir / "slide_mapping.csv"
+    ocr_csv = output_dir / "ocr.csv"
+
+    print("\n\x1b[1mExecuting 2_run_dual_ocr.py...\x1b[0m\n")
+    try:
+        subprocess.run(
+                [
+                    "python", 
+                    "src/2_run_dual_ocr.py", 
+                    "--mapping_csv", 
+                    mapping_csv, 
+                    "--output_csv", 
+                    ocr_csv
+                ], 
+                check=True, 
+                text=True
+        )
+    except Exception as e:
+        parse_except(e)
+
+    enriched_csv = output_dir / "enriched.csv"
+
+    print("\n\x1b[1mExecuting 3_name-files.py...\x1b[0m\n")
+    try:
+        subprocess.run(
+                [
+                    "python", 
+                    "src/3_name-files.py", 
+                    "--input_csv", 
+                    ocr_csv, 
+                    "--output_csv", 
+                    enriched_csv
+                ], 
+                check=True, 
+                text=True
+        )
+    except Exception as e:
+        parse_except(e)
+
+    output_src = output_dir / "src"
+    output_templates = output_src / "templates"
+    os.makedirs(output_src, exist_ok=True)
+    shutil.copy("src/app.py", output_src)
+    shutil.copytree("src/templates/", output_templates, dirs_exist_ok=True)
+
+    output_app = output_src / "app.py"
+
+    print("\n\x1b[1mInitializing database...\x1b[0m\n")
+    try:
+        subprocess.run(
+                [
+                    "flask",
+                    "--app",
+                    output_app,
+                    "init-db"
+                ],
+                check=True,
+                text=True
+        )
+    except Exception as e:
+        parse_except(e)
+
+
+    print("\n\x1b[1mOpening QC app...\x1b[0m\n")
+    qc_app = subprocess.Popen(
+            ["python", output_app],
+            stdin=subprocess.DEVNULL,
+            stdout=None,
+            stderr=None
+    )
+
+    time.sleep(2)
+    open_browser_wsl("http://127.0.0.1:5000")

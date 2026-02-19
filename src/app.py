@@ -76,7 +76,7 @@ class Config:
     IMAGE_BASE_DIR = PROJECT_ROOT
 
     # The full path to the primary CSV file.
-    CSV_FILE_PATH = os.path.join(IMAGE_BASE_DIR, "final.csv")
+    CSV_FILE_PATH = os.path.join(IMAGE_BASE_DIR, "enriched.csv")
     
     # Directory to store timestamped backups.
     BACKUP_DIR = os.path.join(BASE_DIR, "csv_backups")

@@ -295,19 +295,19 @@ if __name__ == "__main__":
         "and appends the results as new columns."
     )
     parser.add_argument(
-        "--input-csv",
+        "--input_csv",
         type=Path,
         required=True,
         help="Path to the input CSV file enriched with OCR text.",
     )
     parser.add_argument(
-        "--output-csv",
+        "--output_csv",
         type=Path,
         required=True,
         help="Path for the final, enriched output CSV file.",
     )
     parser.add_argument(
-        "--accession-pattern",
+        "--accession_pattern",
         type=str,
         # A robust default regex that matches formats like 'NP 22-950' or 'NP22-123'.
         # \b ensures we match whole words only.
