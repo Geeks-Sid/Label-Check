@@ -4,6 +4,7 @@ import shutil, os
 import webbrowser
 import time
 import platform
+import sys, signal
 from pathlib import Path
 
 def parse_except(e: Exception):
@@ -23,6 +24,7 @@ def parse_except(e: Exception):
                 print(f"ERR -- fatal error signal:\n\t{e.stderr}")
 
 
+# use different browser protocol depending on platform
 def open_browser_wsl(url):
     # Check if we are actually in WSL
     if "microsoft-standard" in platform.uname().release.lower():
@@ -31,6 +33,35 @@ def open_browser_wsl(url):
     else:
         import webbrowser
         webbrowser.open(url)
+
+
+def kill_existing_flask(port=5000):
+    """Finds and kills any process currently using the specified port."""
+    try:
+        # Get the PID of the process using the port
+        pid = subprocess.check_output(["lsof", "-ti", f":{port}"]).decode().strip()
+        if pid:
+            print(f"Stopping existing process on port {port} (PID: {pid})...")
+            # Kill the process (and its children)
+            subprocess.run(["kill", "-9", pid])
+            time.sleep(1) # Give the OS a second to actually release the port
+    except subprocess.CalledProcessError:
+        # No process was using the port
+        pass
+
+
+# close app on SIGINT
+qc_app = None
+def signal_handler(sig, frame):
+    """Kills the subprocess when the user hits Ctrl+C."""
+    global qc_app
+    print("\n\x1b[1mShutting down QC app...\x1b[0m")
+    if qc_app:
+        qc_app.terminate() # Polite request to stop
+    sys.exit(0)
+
+# Register the handler
+signal.signal(signal.SIGINT, signal_handler)
 
 
 if __name__ == "__main__":
@@ -66,7 +97,6 @@ if __name__ == "__main__":
     except Exception as e:
         parse_except(e)
 
-    
     mapping_csv = output_dir / "slide_mapping.csv"
     ocr_csv = output_dir / "ocr.csv"
 
@@ -109,6 +139,7 @@ if __name__ == "__main__":
     output_src = output_dir / "src"
     output_templates = output_src / "templates"
     os.makedirs(output_src, exist_ok=True)
+
     shutil.copy("src/app.py", output_src)
     shutil.copytree("src/templates/", output_templates, dirs_exist_ok=True)
 
@@ -129,14 +160,28 @@ if __name__ == "__main__":
     except Exception as e:
         parse_except(e)
 
+    current_src_path = os.path.abspath(output_src)
+
+    # in case the app is still running in the background, kill it first
+    kill_existing_flask() # default port 5000
 
     print("\n\x1b[1mOpening QC app...\x1b[0m\n")
     qc_app = subprocess.Popen(
-            ["python", output_app],
-            stdin=subprocess.DEVNULL,
-            stdout=None,
-            stderr=None
+        ["python", "-m", "flask", "run", "--host", "0.0.0.0"],
+        cwd=output_src,  
+        env={
+            **os.environ, 
+            "FLASK_APP": "app.py",
+            "PYTHONPATH": current_src_path,
+            "PYTHONDONTWRITEBYTECODE": "1"
+        },
+        stdin=subprocess.DEVNULL,
+        stdout=None,
+        stderr=None
     )
-
     time.sleep(2)
     open_browser_wsl("http://127.0.0.1:5000")
+
+    # keep script alive to listen for SIGINT
+    while True:
+        time.sleep(1)
