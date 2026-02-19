@@ -15,8 +15,8 @@ import argparse
 
 class PID:
     pid = 'AAAHQF'
-    prev = ''
-    
+    prev = {}
+
     def __init__(self, instance):
         self.instance = instance
 
@@ -24,7 +24,7 @@ class PID:
 def assign_pid(x: str) -> str:
     pid = PID.pid
 
-    if x != PID.prev:
+    if x not in PID.prev:
         reverse = list(pid[::-1])
         for i in range(len(reverse)):
             cur = reverse[i]
@@ -36,9 +36,9 @@ def assign_pid(x: str) -> str:
         reverse = "".join(reverse)
         pid = reverse[::-1]
         PID.pid = pid
-        PID.prev = x
+        PID.prev[x] = pid
 
-    return pid
+    return PID.prev[x]
 
 
 if __name__ == "__main__":
@@ -71,7 +71,11 @@ if __name__ == "__main__":
 
     # generate PIDs
     final.insert(0, 'PID', None)
-    final['PID'] = final['AccessionID'].map(lambda x: assign_pid(x))
+    for i in range(len(final)):
+        orig = final.loc[i, 'AccessionID']
+        pid = assign_pid(orig)
+        final.loc[i, 'PID'] = pid
+        print(f"Assigned {pid} to {orig}")
     
     # create new paths
     final.insert(final.columns.get_loc('original_slide_path') + 1, 'new_slide_path', None)
@@ -106,7 +110,9 @@ if __name__ == "__main__":
             print(f"ERR: {o_path} doesn't exist")
             continue
 
-    # write new CSV to post_qc.csv in the current directory
-    final.to_csv('post_qc.csv', index=False)
+    # write new CSV to post_qc.csv in the QC directory
+    parent = args.input_csv.parent
+    post_qc = parent / "post_qc.csv"
+    final.to_csv(post_qc, index=False)
     print(f"Changed {num_changed} file paths")
-    print("Wrote new CSV to post_qc.csv")
+    print(f"Wrote new CSV to {post_qc}")
