@@ -210,8 +210,6 @@ def process_slide_files(
 
     # --- Write the results to a CSV file ---
     logger.info(f"Writing mapping to {csv_path}...")
-    # Get the parent directory of the CSV file to calculate relative paths from it.
-    csv_parent_dir = csv_path.parent
     try:
         # Open the CSV file for writing. `newline=''` prevents extra blank rows.
         with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
@@ -229,17 +227,12 @@ def process_slide_files(
                     path_key = f"{img_type}_path"
                     # Check if the image was successfully extracted (path is not None).
                     if result.get(img_type):
-                        # `relative_to` calculates the relative path.
-                        # `.as_posix()` ensures forward slashes are used, which is common for paths in text files.
-                        relative_paths[path_key] = (
-                            result[img_type].relative_to(csv_parent_dir).as_posix()
-                        )
+                        relative_paths[path_key] = result[img_type]
                     else:
                         relative_paths[path_key] = ""  # Use an empty string if not found.
 
-                relative_paths["original_slide_path"] = (
-                    result["original"].relative_to(csv_parent_dir).as_posix()
-                )
+                relative_paths["original_slide_path"] = result["original"]
+
                 writer.writerow(relative_paths)
 
         logger.info(
@@ -260,13 +253,13 @@ if __name__ == "__main__":
     )
     # Define the command-line arguments.
     parser.add_argument(
-        "--input-dir",
+        "--input_dir",
         type=Path,
         required=True,
         help="Input directory containing slide files.",
     )
     parser.add_argument(
-        "--output-dir",
+        "--output_dir",
         type=Path,
         required=True,
         help="Output directory for extracted images.",
@@ -302,13 +295,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Before starting, ensure the parent directory for the output CSV file exists.
-    args.csv_path.parent.mkdir(parents=True, exist_ok=True)
+    output_dir = Path(args.output_dir)
+    csv_path = output_dir / args.csv_path
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Call the main processing function with the parsed arguments.
     process_slide_files(
         args.input_dir,
-        args.output_dir,
-        args.csv_path,
+        output_dir,
+        csv_path,
         args.extensions,
         args.workers,
         tuple(args.thumbnail_size),  # Convert the list [w, h] to a tuple (w, h).
