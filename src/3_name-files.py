@@ -50,6 +50,7 @@ logger = logging.getLogger(__name__)
 # Define the names for the new columns that will be added to the output CSV.
 COL_ACCESSION_ID = "AccessionID"
 COL_STAIN = "Stain"
+COL_BLOCK_NUMBER = "BlockNumber"
 COL_EXTRACTION_SUCCESSFUL = "ExtractionSuccessful"
 # This column is added for compatibility with the manual review tool. It starts empty.
 COL_QC_PASSED = "ParsingQCPassed"
@@ -162,6 +163,7 @@ def process_csv_row(
     updated_row = row.copy()
     accession_id = None
     canonical_stain = None
+    block_number = None
 
     # Combine the OCR text from both label and macro images into a single string for searching.
     search_text = f"{row.get('label_text', '')} {row.get('macro_text', '')}"
@@ -179,11 +181,19 @@ def process_csv_row(
         # Use the pre-built lookup map to get the canonical name.
         canonical_stain = stain_lookup.get(found_variation, found_variation)
 
-    # --- Step 3: Add the new data to the row dictionary ---
+    # --- Step 3: Find and Normalize Block Number
+    block_pattern = re.compile(r"\b([A-Za-z][/]*\d+)\b", re.IGNORECASE)
+    block_match = block_pattern.search(search_text)
+    if block_match:
+        # If found, get rid of forward-slashes
+        block_number = block_match.group(0).replace("/", "").upper()
+
+    # --- Step 4: Add the new data to the row dictionary ---
     updated_row[COL_ACCESSION_ID] = accession_id
     updated_row[COL_STAIN] = canonical_stain
-    # The extraction is considered successful only if BOTH an ID and a stain were found.
-    updated_row[COL_EXTRACTION_SUCCESSFUL] = bool(accession_id and canonical_stain)
+    updated_row[COL_BLOCK_NUMBER] = block_number
+    # The extraction is considered successful only if an ID, a stain, and a block number were found.
+    updated_row[COL_EXTRACTION_SUCCESSFUL] = bool(accession_id and canonical_stain and block_number)
     # Initialize the QC_PASSED column as empty.
     updated_row[COL_QC_PASSED] = ""
 
@@ -263,6 +273,7 @@ def enrich_csv_with_parsing(
     new_headers = (original_headers or []) + [
         COL_ACCESSION_ID,
         COL_STAIN,
+        COL_BLOCK_NUMBER,
         COL_EXTRACTION_SUCCESSFUL,
         COL_QC_PASSED,
     ]
@@ -279,7 +290,7 @@ def enrich_csv_with_parsing(
         # Log a final summary of the operation.
         logger.info("CSV enrichment complete.")
         logger.info(f"Successfully processed {len(updated_rows)} data rows.")
-        logger.info(f"Successfully extracted both ID and Stain in {successful_extractions} rows ({successful_extractions / len(updated_rows):.2%}).")
+        logger.info(f"Successfully extracted ID, Stain, and Block Number in {successful_extractions} rows ({successful_extractions / len(updated_rows):.2%}).")
 
     except Exception as e:
         logger.exception(f"An unexpected error occurred while writing the output file: {e}")
@@ -312,9 +323,10 @@ if __name__ == "__main__":
         # A robust default regex that matches formats like 'NP 22-950' or 'NP22-123'.
         # \b ensures we match whole words only.
         # \s* allows for zero or more spaces.
-        default=r"\b(NP\s*\d{2}\s*-\s*\d+)\b",
+        default=r"\b([A-Za-z]+\d+[-/]\d+)\b",
         help="Regex pattern to extract the Accession ID.",
     )
+
     parser.add_argument(
         "--workers",
         type=int,
