@@ -2,7 +2,7 @@ openslide-bin
 openslide-python
 tqdm
 opencv-python
-easyocr
+pytesseract
 flask
 flask-login
 flask-sqlalchemy
