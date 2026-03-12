@@ -688,6 +688,17 @@
                 // Add a listener to the checkbox to toggle the button state whenever it changes
                 completeCheckbox.addEventListener('change', toggleNextButtonState);
             }
+
+            // Auto-focus: first empty editable field, or "Mark as Complete" if all fields are filled
+            const editableFields = ['accession_id', 'stain', 'block_number']
+                .map(id => document.getElementById(id))
+                .filter(el => el && !el.readOnly);
+            const firstEmpty = editableFields.find(el => el.value.trim() === '');
+            if (firstEmpty) {
+                firstEmpty.focus();
+            } else if (completeCheckbox && !completeCheckbox.disabled) {
+                completeCheckbox.focus();
+            }
         });
     </script>
 </body>
