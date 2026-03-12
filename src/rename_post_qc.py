@@ -43,7 +43,7 @@ def assign_pid(x: str) -> str:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-            description="Create new CSV using the CSV produced from the fourth step of the Label-Check pipeline"
+            description="Rename files using CSV produced from the fourth step of the Label-Check pipeline (app.py)"
     )
     parser.add_argument(
             "--input_csv",
@@ -103,7 +103,8 @@ if __name__ == "__main__":
        
         # make sure path exists before renaming
         if o_path.exists():
-            o_path.rename(new_path)
+            # not renaming yet, for testing purposes
+            # o_path.rename(new_path)
             num_changed += 1
             final.loc[i, 'new_slide_path'] = new_path   
         else:
