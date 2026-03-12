@@ -60,36 +60,69 @@ COL_QC_PASSED = "ParsingQCPassed"
 # variations that should be mapped to it. This can be easily extended or moved to an
 # external config file (like JSON) for easier management.
 STAIN_NAME_CORRECTIONS = {
-    "H&E": ["H and E", "H+E", "H-E", "HBE", "H8E", "#&E", "HnE", "H8E", "HnBE", "H&E", "HeE"],
+    "H&E": ["H and E", "H+E", "H-E", "HBE", "H&B_", "H8E", "H8E_1", "H8E_", "#&E", "HnE", "H8E", "HnBE", "H&E", "HeE", "H&E_1", "H&E_"],
     "TPREP": ["T-PREP", "TPREP", "T PREP", "TP-REP", "TPREP."],
     "IDH": ["IDH1", "IDH-1", "IDHl", "lDH", "IDH.", "IDH"],
+    "INI1": ["INI 1", "1NI 1", "IN1 1", "1N1 1", "1N1 I", "INI I", "INI_1", "1NI_1", "IN1_1", "1N1_1", "1N1_I", "INI_I", "1NI1", "IN11", "1N11", "1N1I", "INII", "INI1"],
+    "ACTIN_1A4": ["ACTIN 1A4", "ACTIN_1AA", "ACTIN_1A4"],
     "ATRX": ["ATR-X", "ATRX", "ATR X", "ATRX.", "AT-RX"],
     "1P19Q": ["1P/19Q", "1P-19Q", "1P 19Q", "1P19-Q", "1P19Q.", "1P19Q"],
-    "P53": ["P-53", "P 53", "P53.", "P5-3", "P-5-3", "P53"],
+    "P16": ["P-16", "P 16", "P16.", "P1-6", "P-1-6", "016", "O16", "P16"],
+    "P53": ["P-53", "P 53", "P53.", "P5-3", "P-5-3", "053", "O53", "P53"],
     "KI67": ["KI-67", "KI 67", "KI67.", "K167", "KI-6-7", "KI67"],
     "OLIG2": ["OLIG-2", "OLIG 2", "OLIG2.", "OL1G2", "OLIG-2.", "OLIG2"],
     "EGFR": ["E-GFR", "EGFR", "EGFR.", "E GFR", "EG-FR"],
     "MGMT": ["M-GMT", "MGMT", "MGMT.", "MGM-T", "M-G-MT"],
     "H3K27M": ["H3-K27M", "H3 K27M", "H3K27M.", "H3K-27M", "H3-K-27M", "H3K27M"],
     "GFAP": ["G-FAP", "GFAP", "GFAP.", "GFA-P", "G-F-AP"],
-    "CD34": ["CD-34", "CD 34", "CD34.", "CD3-4", "C-D34", "CD34"],
+    "CD34": ["CD-34", "CD 34", "CD34.", "CD3-4", "C-D34", "CD34", "CD-3A", "CD 3A", "CD3A.", "CD3-A", "C-D3A", "CD3A"],
+    "CD43": ["CD-43", "CD 43", "CD43.", "CD3-4", "C-D43", "CD43", "CD-A3", "CD A3", "CDA3.", "CD3-A", "C-DA3", "CDA3"],
+    "CD31": ["CD-31", "CD 31", "CD31.", "CD3-1", "C-D31", "CD31", "CD-3I", "CD 3I", "CD3I.", "CD3-I", "C-D3I", "CD3I"],
     "CD68": ["CD-68", "CD 68", "CD68.", "C-D68", "C-D-68", "CD68"],
     "CD3": ["CD-3", "CD 3", "CD3.", "C-D3", "C-D-3", "CD3"],
-    "CD20": ["CD-20", "CD 20", "CD20.", "C-D20", "C-D-20", "CD20"],
+    "CD20": ["CD-20", "CD 20", "CD20.", "C-D20", "C-D-20", "CD20", "CD-2O", "CD 2O", "CD2O.", "C-D2O", "C-D-2O", "CD2O"],
+    "CD30": ["CD-30", "CD 30", "CD30.", "C-D30", "C-D-30", "CD30", "CD-Z0", "CD Z0", "CDZ0.", "C-DZ0", "C-D-Z0", "CDZ0", "CD-3O", "CD 3O", "CD3O.", "C-D3O", "C-D-3O", "CD3O", "CD-ZO", "CD ZO", "CDZO.", "C-DZO", "C-D-ZO", "CDZO"],
     "BRCA1": ["BRCA-1", "BRCA 1", "BRCA1.", "B-RCA1", "B-RCA-1", "BRCA1"],
     "HER2": ["HER-2", "HER 2", "HER2.", "H-ER2", "H-ER-2", "HER2"],
     "PTEN": ["P-TEN", "PTEN", "PTEN.", "P-T-EN", "P-T-EN."],
-    "FS1": ["FS-1", "FS 1", "FS1.", "F-S1", "F-S-1", "FS1"],
+    "FS1": ["FS-1", "FS 1", "FS1.", "F-S1", "F-S-1", "{S1", "FS1"],
     "TP53": ["TP-53", "TP 53", "TP53.", "T-P53", "T-P-53", "TP53"],
     "CD45": ["CD-45", "CD 45", "CD45.", "C-D45", "C-D-45", "CD45"],
     "CD8": ["CD-8", "CD 8", "CD8.", "C-D8", "C-D-8", "CD8"],
     "CD4": ["CD-4", "CD 4", "CD4.", "C-D4", "C-D-4", "CD4"],
     "CD56": ["CD-56", "CD 56", "CD56.", "C-D56", "C-D-56", "CD56"],
+    "CD1A": ["CDIA", "CDA", "CD1A"],
+    "MUM-1": ["MUM 1", "MUM1", "MUM I", "MUMI", "MUM-I", "MUM-1"],
     "KRAS": ["K-RAS", "KRAS", "KRAS.", "K-RAS.", "K-RAS"],
     "NRAS": ["N-RAS", "NRAS", "NRAS.", "N-RAS.", "N-RAS"],
     "BRAF": ["B-RAF", "BRAF", "BRAF.", "B-RAF.", "B-RAF"],
     "CTNNB1": ["CTNNB-1", "CTNNB 1", "CTNNB1.", "C-TNNB1", "C-TNNB-1", "CTNNB1"],
     "ALK": ["A-LK", "ALK", "ALK.", "A-LK."],
+    "LANGERIN": ["LANGERIM", "LARGERIN", "LARGERIM", "LANGERIN"],
+    "HBA71_CD99": ["HBA.71 CD99", "HBA 71 CD99", "HBA71 CD99", "HBA.71 CD9g", "HBA 71 CD9g", "HBA71 CD9g", "HBA.71 CDg9", "HBA 71 CDg9", "HBA71 CDg9", "HBA.71 CDgg", "HBA 71 CDgg", "HBA71 CDgg", "HBA71_CD99"],
+    "HMBA45": ["HMBA45"],
+    "HMB-45-RED": ["HMB-45-RED"],
+    "MELAN_A_RED": ["MELAN A-RED", "MELAN_A_RED"],
+    "SOX-10": ["S0X-10", "S0X-1O", "SOX-1O", "SOX-10"],
+    "SOX-10-RED": ["S0X-10-RED", "S0X-1O-RED", "SOX-1O-RED", "SOX-10-RED"],
+    "MSH2-FE11": ["MSH? (FE1 1)", "MSH? (FE11)", "MSHZ (FE1 1)", "MSHZ (FE11)", "MSH2 (FE1 1)", "MSH2 (FE11)"],
+    "MSH6-EP49": ["MSH6 (EPA9)", "MSH6 (EPA9}", "MSH6 (EP49)"],
+    "WT-1": ["WT-1"],
+    "PMS2-EP51": ["PMS2-EP51"],
+    "NEUROFILAMENT": ["NEUROFILAMENT"],
+    "TOXOPLASMA": ["TOXOPLASMA"],
+    "RETIC": ["RETIC"],
+    "NEUN": ["NEUN"],
+    "PAS": ["PAS"],
+    "NUT": ["NUT"],
+    "SYNAPTOPHYSIN": ["SVNANTONHVSIN", "SYNAPTEPHYSIN", "SYNAPTEPBYSIS", "SVNAPTOPHVSIZ", "SYNAPTOPHYSIN"],
+    "CKAE13": ["CK AE1/3", "CKAE13"],
+    "MYOD1": ["MYOD1"],
+    "DESMIN": ["DESMIN"],
+    "S100": ["$100", "5100", "S100"],
+    "CD14-EPR": ["CD1AEPR", "CD14EPR", "CD1A-EPR", "CD14-EPR"],
+    "CD-163": ["CD 163", "CD-163"],
+    "STAT6": ["STAT6"]
 }
 
 
@@ -133,7 +166,8 @@ def build_stain_normalizer(
 
     # Join all variations into a single regex "OR" pattern (e.g., 'h-e|h\+e|h&e').
     # re.escape() is used to handle special characters like '+' correctly.
-    pattern_str = "|".join(re.escape(var) for var in sorted_variations)
+    # Wrap in \b anchors to prevent matching against patterns inside of e.g. accession IDs.
+    pattern_str = r"\b(" + "|".join(re.escape(var) for var in sorted_variations) + r")\b"
     pattern = re.compile(pattern_str, re.IGNORECASE)
 
     return pattern, variation_lookup
@@ -173,6 +207,14 @@ def process_csv_row(
     if accession_match:
         # If a match is found, normalize it to a standard format (uppercase, hyphens, no spaces).
         accession_id = accession_match.group(0).replace(" ", "-").upper()
+    else:
+        # If no match is found, see if the filename contains the accession ID
+        file_path = row.get('original_slide_path', '')
+        cleaned_path = re.sub(r'\\+', '/', file_path)
+        file_name = cleaned_path.split('/')[-1]
+        accession_match = accession_pattern.search(file_name)
+        if accession_match:
+            accession_id = accession_match.group(0).replace(" ", "-").upper()
 
     # --- Step 2: Find and Normalize the Stain Name ---
     stain_match = stain_pattern.search(search_text)
@@ -182,11 +224,21 @@ def process_csv_row(
         canonical_stain = stain_lookup.get(found_variation, found_variation)
 
     # --- Step 3: Find and Normalize Block Number
-    block_pattern = re.compile(r"\b([A-Za-z][/]*\d+)\b", re.IGNORECASE)
-    block_match = block_pattern.search(search_text)
-    if block_match:
-        # If found, get rid of forward-slashes
-        block_number = block_match.group(0).replace("/", "").upper()
+    block_pattern = re.compile(r"\b([A-Za-z]\s*[/]*\s*\d+)\b", re.IGNORECASE)
+    
+    # block numbers might match stain patterns (e.g. p16, p53),
+    # so we need to find everything that looks like a block number and filter out
+    all_potential_blocks = re.finditer(block_pattern, search_text)
+
+    for match in all_potential_blocks:
+        # 2. Check if this block match overlaps with the stain match
+        # We check if the block start is within the stain range, or vice versa
+        if stain_match and (match.start() < stain_match.end() and match.end() > stain_match.start()):
+            continue  # It's a stain! Skip to the next match
+        
+        # 3. If we get here, it's a valid block
+        block_number = match.group(0).replace("/", "").replace(" ", "").upper()
+        break # Grab the first valid one and exit the loop
 
     # --- Step 4: Add the new data to the row dictionary ---
     updated_row[COL_ACCESSION_ID] = accession_id
