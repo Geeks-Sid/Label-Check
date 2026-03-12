@@ -387,7 +387,7 @@ class DataManager:
         self.data: List[Dict[str, Any]] = []
         self.headers: List[str] = []
         self._lock = threading.Lock() # Ensure thread safety for data access
-        self.critical_headers = ["AccessionID", "Stain", "ParsingQCPassed", "original_slide_location"]
+        self.critical_headers = ["AccessionID", "Stain", "ParsingQCPassed", "original_slide_path"]
 
     def load_data(self, file_path: str = Config.CSV_FILE_PATH) -> None:
         """Loads CSV data into memory safely."""
