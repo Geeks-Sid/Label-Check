@@ -1,9 +1,9 @@
-openslide-bin
-openslide-python
-tqdm
-opencv-python
-easyocr
 flask
 flask-login
 flask-sqlalchemy
+numpy
+opencv-python
+openslide-bin
+openslide-python
 pandas
+tqdm
