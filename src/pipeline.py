@@ -74,67 +74,76 @@ if __name__ == "__main__":
     parser.add_argument(
             "--output_dir", required=True, help="Output directory to place macros, labels, and thumbnails and wherein to conduct QC"
     )
+    parser.add_argument(
+            "--start_from", required=False, help="Stage of the pipeline to start from (1/macro, 2/ocr, 3/name, app)", choices=['1', 'macro', '2', 'ocr', '3', 'name', 'app']
+    )
     # create a config file for all of the other arguments, but these two must be provided at runtime
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
+    start_from = args.start_from
    
-    print("\x1b[1mExecuting 1_get_macro.py...\x1b[0m\n")
-    try:
-        subprocess.run(
-                [
-                    "python", 
-                    "src/1_get_macro.py", 
-                    "--input_dir", 
-                    input_dir, 
-                    "--output_dir", 
-                    output_dir
-                ], 
-                check=True, 
-                text=True
-        )
-    except Exception as e:
-        parse_except(e)
+    if start_from in [None, '1', 'macro']:
+        print("\x1b[1mExecuting 1_get_macro.py...\x1b[0m\n")
+        try:
+            subprocess.run(
+                    [
+                        "python", 
+                        "src/1_get_macro.py", 
+                        "--input_dir", 
+                        input_dir, 
+                        "--output_dir", 
+                        output_dir
+                    ], 
+                    check=True, 
+                    text=True
+            )
+        except Exception as e:
+            parse_except(e)
+            sys.exit(1)
 
     mapping_csv = output_dir / "slide_mapping.csv"
     ocr_csv = output_dir / "ocr.csv"
 
-    print("\n\x1b[1mExecuting 2_run_dual_ocr.py...\x1b[0m\n")
-    try:
-        subprocess.run(
-                [
-                    "python", 
-                    "src/2_run_dual_ocr.py", 
-                    "--mapping_csv", 
-                    mapping_csv, 
-                    "--output_csv", 
-                    ocr_csv
-                ], 
-                check=True, 
-                text=True
-        )
-    except Exception as e:
-        parse_except(e)
+    if start_from in [None, '1', 'macro', '2', 'ocr']:
+        print("\n\x1b[1mExecuting 2_run_dual_ocr.py...\x1b[0m\n")
+        try:
+            subprocess.run(
+                    [
+                        "python", 
+                        "src/2_run_dual_ocr.py", 
+                        "--mapping_csv", 
+                        mapping_csv, 
+                        "--output_csv", 
+                        ocr_csv
+                    ], 
+                    check=True, 
+                    text=True
+            )
+        except Exception as e:
+            parse_except(e)
+            sys.exit(1)
 
     enriched_csv = output_dir / "enriched.csv"
 
-    print("\n\x1b[1mExecuting 3_name-files.py...\x1b[0m\n")
-    try:
-        subprocess.run(
-                [
-                    "python", 
-                    "src/3_name-files.py", 
-                    "--input_csv", 
-                    ocr_csv, 
-                    "--output_csv", 
-                    enriched_csv
-                ], 
-                check=True, 
-                text=True
-        )
-    except Exception as e:
-        parse_except(e)
+    if start_from != 'app':
+        print("\n\x1b[1mExecuting 3_name-files.py...\x1b[0m\n")
+        try:
+            subprocess.run(
+                    [
+                        "python", 
+                        "src/3_name-files.py", 
+                        "--input_csv", 
+                        ocr_csv, 
+                        "--output_csv", 
+                        enriched_csv
+                    ], 
+                    check=True, 
+                    text=True
+            )
+        except Exception as e:
+            parse_except(e)
 
     output_src = output_dir / "src"
     output_templates = output_src / "templates"
@@ -159,6 +168,7 @@ if __name__ == "__main__":
         )
     except Exception as e:
         parse_except(e)
+        sys.exit(1)
 
     current_src_path = os.path.abspath(output_src)
 
