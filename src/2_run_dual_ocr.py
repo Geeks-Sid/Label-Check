@@ -170,7 +170,7 @@ def perform_ocr_on_row(row: dict, csv_dir: Path, reader: easyocr.Reader) -> dict
                 image_label_np = np.array(image_label_pil)
                 processed_label = preprocess_image_for_ocr(image_label_np)
                 ocr_results = reader.readtext(
-                        processed_label, rotation_info=[0, 90, 180, 270]
+                        processed_label, rotation_info=[0, 90, 270]
                 )
                 # Concatenate all detected text fragments into a single string.
                 label_text = " ".join([text for _, text, _ in ocr_results])
