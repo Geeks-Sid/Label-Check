@@ -60,7 +60,7 @@ COL_QC_PASSED = "ParsingQCPassed"
 # variations that should be mapped to it. This can be easily extended or moved to an
 # external config file (like JSON) for easier management.
 STAIN_NAME_CORRECTIONS = {
-    "H&E": ["H and E", "H+E", "H-E", "HBE", "H&B_", "H8E", "H8E_1", "H8E_", "#&E", "HnE", "H8E", "HnBE", "H&E", "HeE", "H&E_1", "H&E_"],
+    "H&E": ["Hematoxylin", "Hematoxylir", "H and E", "H+E", "H-E", "HBE", "H&B_", "H8E", "H8E_1", "H8E_", "#&E", "HnE", "H8E", "HnBE", "H&E", "HeE", "H&E_1", "H&E_"],
     "TPREP": ["T-PREP", "TPREP", "T PREP", "TP-REP", "TPREP."],
     "IDH": ["IDH1", "IDH-1", "IDHl", "lDH", "IDH.", "IDH"],
     "INI1": ["INI 1", "1NI 1", "IN1 1", "1N1 1", "1N1 I", "INI I", "INI_1", "1NI_1", "IN1_1", "1N1_1", "1N1_I", "INI_I", "1NI1", "IN11", "1N11", "1N1I", "INII", "INI1"],
@@ -207,6 +207,8 @@ def process_csv_row(
     if accession_match:
         # If a match is found, normalize it to a standard format (uppercase, hyphens, no spaces).
         accession_id = accession_match.group(0).replace(" ", "-").upper()
+        # Remove the match from the search text so that the regex doesn't attempt to find block number in the accession ID
+        search_text = search_text.replace(accession_match.group(0), "")
     else:
         # If no match is found, see if the filename contains the accession ID
         file_path = row.get('original_slide_path', '')
@@ -375,7 +377,7 @@ if __name__ == "__main__":
         # A robust default regex that matches formats like 'NP 22-950' or 'NP22-123'.
         # \b ensures we match whole words only.
         # \s* allows for zero or more spaces.
-        default=r"\b([A-Za-z]+\d+[-/]\d+)\b",
+        default=r"\b([A-Za-z]+\d+[ -/]\d+)\b",
         help="Regex pattern to extract the Accession ID.",
     )
 
