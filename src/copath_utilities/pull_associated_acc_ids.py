@@ -117,10 +117,31 @@ query = """
 
 
 def escape_sql_literal(value):
+    """
+    Escape apostrophes in a value before embedding it in SQL.
+
+    Args:
+        value (object): Input value to validate, transform, or persist.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     return value.replace("'", "''")
 
 
 def parse_accession_id(accession_id):
+    """
+    Validate and parse an accession identifier into its components.
+
+    Args:
+        accession_id (object): Input accession id used by the operation.
+
+    Returns:
+        dict: Parsed accession components, or an exception for invalid input.
+
+    Raises:
+        ValueError: If validation or the underlying resource operation fails.
+    """
     normalized_accession_id = accession_id.strip()
     match = ACCESSION_PATTERN.fullmatch(normalized_accession_id)
     if match is None:
@@ -139,6 +160,16 @@ def parse_accession_id(accession_id):
 
 
 def write_invalid_accessions_csv(invalid_accessions, output_path=INVALID_ACCESSIONS_FILENAME):
+    """
+    Write the invalid accessions CSV.
+
+    Args:
+        invalid_accessions (object): Input invalid accessions used by the operation.
+        output_path (object): Path to the output.
+
+    Returns:
+        object: Output path when invalid accessions were written, otherwise None.
+    """
     if not invalid_accessions:
         return None
 
@@ -151,6 +182,16 @@ def write_invalid_accessions_csv(invalid_accessions, output_path=INVALID_ACCESSI
 
 
 def format_query(mrn, accession):
+    """
+    Select and format the appropriate CoPath query for an identifier type.
+
+    Args:
+        mrn (object): Input MRN used by the operation.
+        accession (object): Input accession used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     return query.format(
         mrn=escape_sql_literal(mrn),
         accession_id=escape_sql_literal(accession["accession_id"]),

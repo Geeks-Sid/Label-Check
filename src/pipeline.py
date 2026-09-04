@@ -13,7 +13,15 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 def parse_except(error: subprocess.CalledProcessError) -> None:
-    """Print a useful message for a failed child process."""
+    """
+    Print a useful message for a failed child process.
+
+    Args:
+        error (subprocess.CalledProcessError): Exception information supplied by the runtime.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     if error.returncode < 0:
         print(f"Terminated by signal: {error}")
         return
@@ -30,7 +38,15 @@ def parse_except(error: subprocess.CalledProcessError) -> None:
 
 
 def open_browser_wsl(url: str) -> None:
-    """Open a URL using the host browser, including from WSL."""
+    """
+    Open a URL using the host browser, including from WSL.
+
+    Args:
+        url (str): Input url used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     if os.environ.get("LABEL_CHECK_CONTAINER", "false").lower() == "true":
         return
     if "microsoft-standard" in platform.uname().release.lower():
@@ -42,7 +58,15 @@ def open_browser_wsl(url: str) -> None:
 
 
 def kill_existing_flask(port: int = 5000) -> None:
-    """Find and stop any process currently using the specified port."""
+    """
+    Find and stop any process currently using the specified port.
+
+    Args:
+        port (int): Input port used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     try:
         pid = subprocess.check_output(["lsof", "-ti", f":{port}"]).decode().strip()
         if pid:
@@ -57,7 +81,16 @@ qc_app = None
 
 
 def signal_handler(_sig, _frame) -> None:
-    """Stop the QC subprocess when the pipeline receives Ctrl+C."""
+    """
+    Stop the QC subprocess when the pipeline receives Ctrl+C.
+
+    Args:
+        _sig (object): Input sig used by the operation.
+        _frame (object): Input frame used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     global qc_app
     print("\n\x1b[1mShutting down QC app...\x1b[0m")
     if qc_app:
@@ -69,7 +102,16 @@ signal.signal(signal.SIGINT, signal_handler)
 
 
 def copytree_pure_data(src: Path, dst: Path) -> None:
-    """Recursively copy file contents without preserving metadata."""
+    """
+    Recursively copy file contents without preserving metadata.
+
+    Args:
+        src (Path): Input src used by the operation.
+        dst (Path): Input dst used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     if src.resolve() == dst.resolve():
         return
     for root, _dirs, files in os.walk(src):
@@ -82,7 +124,15 @@ def copytree_pure_data(src: Path, dst: Path) -> None:
 
 
 def build_stage_commands(args: argparse.Namespace) -> dict[int, list[object]]:
-    """Build child commands, including only explicitly supplied overrides."""
+    """
+    Build child commands, including only explicitly supplied overrides.
+
+    Args:
+        args (argparse.Namespace): Input args used by the operation.
+
+    Returns:
+        dict[int, list[object]]: Transformed representation of the supplied input.
+    """
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
     mapping_csv = output_dir / "slide_mapping.csv"
@@ -145,6 +195,16 @@ def build_stage_commands(args: argparse.Namespace) -> dict[int, list[object]]:
 
 
 def normalized_stage(value: str | None, default: int) -> int:
+    """
+    Normalize a requested pipeline stage to a supported stage number.
+
+    Args:
+        value (str | None): Input value to validate, transform, or persist.
+        default (int): Input default used by the operation.
+
+    Returns:
+        int: Count, status, or numeric result produced by the operation.
+    """
     aliases = {"1": 1, "macro": 1, "2": 2, "ocr": 2, "3": 3, "name": 3}
     if value is None:
         return default
@@ -152,13 +212,31 @@ def normalized_stage(value: str | None, default: int) -> int:
 
 
 def run_stage(stage: int, command: list[object]) -> None:
+    """
+    Run one pipeline stage and report child-process failures.
+
+    Args:
+        stage (int): Input stage used by the operation.
+        command (list[object]): Input command used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     labels = {1: "1_get_macro.py", 2: "2_run_dual_ocr.py", 3: "3_name-files.py"}
     print(f"\n\x1b[1mExecuting {labels[stage]}...\x1b[0m\n", flush=True)
     subprocess.run(command, check=True, text=True)
 
 
 def copy_app_bundle(output_dir: Path) -> Path:
-    """Copy the QC app and pipeline launcher into a portable output bundle."""
+    """
+    Copy the QC app and pipeline launcher into a portable output bundle.
+
+    Args:
+        output_dir (Path): Directory used as the output dir.
+
+    Returns:
+        Path: Path to the copied application bundle.
+    """
     output_src = output_dir / "src"
     output_src.mkdir(parents=True, exist_ok=True)
     for filename in (
@@ -182,6 +260,12 @@ def copy_app_bundle(output_dir: Path) -> Path:
 
 
 def create_parser() -> argparse.ArgumentParser:
+    """
+    Create the command-line argument parser for the pipeline launcher.
+
+    Returns:
+        argparse.ArgumentParser: Value produced by the operation.
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Pipeline for the modules inside Label-Check. Runs preprocessing stages "
@@ -219,6 +303,12 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """
+    Run the command-line entry point.
+
+    Returns:
+        int: Process exit status, where applicable.
+    """
     args = create_parser().parse_args()
     start_from_app = args.start_from == "app"
     start_stage = 4 if start_from_app else normalized_stage(args.start_from, 1)

@@ -41,16 +41,49 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
 
     def set_password(self, password):
+        """
+        Hash and store a user password.
+
+        Args:
+            password (object): Input password used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.password_hash = generate_password_hash(password)
 
     def verify_password(self, password):
+        """
+        Verify a password against the stored password hash.
+
+        Args:
+            password (object): Input password used by the operation.
+
+        Returns:
+            object: Value produced by the operation.
+        """
         return check_password_hash(self.password_hash, password)
 
     def __repr__(self):
+        """
+        Return a concise developer-facing representation of the User.
+
+        Returns:
+            str: String representation or formatted value produced by the operation.
+        """
         return f'<User {self.id}>'
 
 @login_manager.user_loader
 def load_user(user_id):
+    """
+    Load a user account by identifier for Flask-Login.
+
+    Args:
+        user_id (object): Identifier of the user associated with the operation.
+
+    Returns:
+        object: User record loaded by Flask-Login, or None when absent.
+    """
     return User.query.get(user_id)
 
 # --- Global Data Store ---
@@ -64,6 +97,9 @@ def _recalculate_accession_counts():
     """
     NEW: Iterates through all data to recount all accession IDs.
     This is the authoritative source of the count and ensures data integrity.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     global data
     if not data:
@@ -86,6 +122,12 @@ def parse_original_line(line_str):
     """
     Parses the 'OriginalLine' string to extract the patient identifier,
     and the text from 'Label:' and 'Macro:' fields.
+
+    Args:
+        line_str (object): Input line str used by the operation.
+
+    Returns:
+        tuple: Tuple containing the extracted identifier, label text, and macro text.
     """
     identifier = None
     label_text = "N/A"
@@ -110,9 +152,24 @@ def parse_original_line(line_str):
     return identifier, label_text, macro_text
 
 def _is_row_incomplete(row_dict):
+    """
+    Return whether a data row still requires review.
+
+    Args:
+        row_dict (object): Input row dict used by the operation.
+
+    Returns:
+        object: Value produced by the operation.
+    """
     return not row_dict.get('_is_complete', False)
 
 def get_current_display_list_indices():
+    """
+    Return source-row indices visible under the current filter.
+
+    Returns:
+        list: Collection produced from the supplied input or stored state.
+    """
     filter_active = session.get('show_only_incomplete', False)
     if not data:
         return []
@@ -122,6 +179,15 @@ def get_current_display_list_indices():
         return list(range(len(data)))
 
 def get_display_info_for_original_index(original_index):
+     """
+     Return display position information for a source-row index.
+
+     Args:
+         original_index (object): Input original index used by the operation.
+
+     Returns:
+         dict: Display position and total visible-row information, or None.
+     """
      display_indices = get_current_display_list_indices()
      try:
          display_index = display_indices.index(original_index)
@@ -133,6 +199,16 @@ def get_display_info_for_original_index(original_index):
          return None
 
 def find_navigation_index(current_original_index, direction):
+    """
+    Return the next or previous visible source-row index.
+
+    Args:
+        current_original_index (object): Input current original index used by the operation.
+        direction (object): Navigation or sorting option controlling the result order.
+
+    Returns:
+        object: The target visible source-row index, or None when unavailable.
+    """
     if not data: return None
     display_indices = get_current_display_list_indices()
     if not display_indices: return None
@@ -166,6 +242,12 @@ def load_csv_data(file_path=CSV_FILE_PATH):
     """
     Loads data from CSV. Includes logic for patient file counting and
     initial calculation of accession ID counts.
+
+    Args:
+        file_path (object): Path to the input file or directory.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
     """
     global data, headers
     print(f"INFO: Attempting to load CSV data from: {file_path}")
@@ -229,7 +311,15 @@ def load_csv_data(file_path=CSV_FILE_PATH):
         return False
 
 def save_csv_data(target_path=CSV_FILE_PATH):
-    """Saves in-memory data to the specified path."""
+    """
+    Saves in-memory data to the specified path.
+
+    Args:
+        target_path (object): Path to the target.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+    """
     global data, headers
     if not headers:
         flash("Error: Cannot save, headers not loaded.", "error")
@@ -266,6 +356,12 @@ def save_csv_data(target_path=CSV_FILE_PATH):
 
 
 def _create_backup():
+    """
+    Create a timestamped backup of the primary CSV file.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+    """
     if not os.path.exists(CSV_FILE_PATH):
         return False
     try:
@@ -281,6 +377,12 @@ def _create_backup():
         return False
 
 def save_intermediate_backup():
+    """
+    Persist a recovery backup of the current in-memory data.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     global data
     if not data: return
     if save_csv_data(target_path=INTERMEDIATE_BACKUP_FILE):
@@ -293,6 +395,12 @@ def save_intermediate_backup():
 
 @app.before_request
 def ensure_data_loaded():
+    """
+    Ensure application data and request defaults are loaded before a request.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     if request.endpoint in ['static', 'serve_image', 'login', 'logout', 'add_user', 'users_management']:
         return
     if 'show_only_incomplete' not in session: session['show_only_incomplete'] = False
@@ -326,7 +434,12 @@ def ensure_data_loaded():
 # ... (login, logout, users_management, add_user routes are unchanged) ...
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Handles user login."""
+    """
+    Handles user login.
+
+    Returns:
+        Response | str: Value produced by the operation.
+    """
     if current_user.is_authenticated:
         return redirect(url_for('index'))
 
@@ -347,7 +460,12 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
-    """Logs out the current user."""
+    """
+    Logs out the current user.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     logout_user()
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
@@ -355,7 +473,12 @@ def logout():
 @app.route('/users')
 @login_required
 def users_management():
-    """Displays user management page (admin only)."""
+    """
+    Displays user management page (admin only).
+
+    Returns:
+        Response | str: Value produced by the operation.
+    """
     if not current_user.is_admin:
         flash("You do not have permission to view user management.", "error")
         return redirect(url_for('index'))
@@ -365,7 +488,12 @@ def users_management():
 @app.route('/add_user', methods=['POST'])
 @login_required
 def add_user():
-    """Handles adding a new user (admin only)."""
+    """
+    Handles adding a new user (admin only).
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     if not current_user.is_admin:
         flash("You do not have permission to add users.", "error")
         return redirect(url_for('index'))
@@ -395,6 +523,12 @@ def add_user():
 @app.route('/', methods=['GET'])
 @login_required
 def index():
+    """
+    Render the primary review interface and select the active work item.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     if not data:
         return render_template('index.html', error_message="Failed to load CSV data.", data_loaded=False, messages=flash_messages())
 
@@ -436,7 +570,12 @@ def index():
 @app.route('/update', methods=['POST'])
 @login_required
 def update():
-    """Handles updating record data, including BlockNumber and Accession ID counts."""
+    """
+    Handles updating record data, including BlockNumber and Accession ID counts.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     global data
     if not data:
         flash("Error: Data not loaded, cannot update.", "error")
@@ -530,7 +669,12 @@ def update():
 @app.route('/jump', methods=['POST'])
 @login_required
 def jump():
-    """Handles jumping to a specific item in the display queue."""
+    """
+    Handles jumping to a specific item in the display queue.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     if not data: return redirect(url_for('index'))
 
     try:
@@ -563,7 +707,12 @@ def jump():
 @app.route('/search', methods=['POST'])
 @login_required
 def search():
-    """Handles searching for a specific Accession ID or Patient Identifier."""
+    """
+    Handles searching for a specific Accession ID or Patient Identifier.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     if not data: return redirect(url_for('index'))
 
     search_term = request.form.get('search_term', '').strip()
@@ -595,7 +744,12 @@ def search():
 @app.route('/save', methods=['POST'])
 @login_required
 def save():
-    """Handles saving all in-memory data back to the primary CSV file, with backup."""
+    """
+    Handles saving all in-memory data back to the primary CSV file, with backup.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     if not _create_backup():
         flash("Save cancelled because backup failed.", "error")
     else:
@@ -609,7 +763,16 @@ def save():
     return redirect(url_for('index', index=current_index))
 @app.route('/images/<subdir>/<path:filename>')
 def serve_image(subdir, filename):
-    """Serves image files from specified subdirectories."""
+    """
+    Serves image files from specified subdirectories.
+
+    Args:
+        subdir (object): Input subdir used by the operation.
+        filename (object): Input filename or path for the file.
+
+    Returns:
+        Response | tuple: Value produced by the operation.
+    """
     print(f"DEBUG: serve_image called with subdir={subdir}, filename={filename}")
     print(f"DEBUG: IMAGE_BASE_DIR={IMAGE_BASE_DIR}")
     print(f"DEBUG: Current working directory={os.getcwd()}")
@@ -645,7 +808,12 @@ def serve_image(subdir, filename):
         return "Error serving image file.", 500
 
 def flash_messages():
-    """Helper to retrieve and format flash messages."""
+    """
+    Helper to retrieve and format flash messages.
+
+    Returns:
+        object: Value produced by the operation.
+    """
     messages = []
     flashed = get_flashed_messages(with_categories=True)
     if flashed:

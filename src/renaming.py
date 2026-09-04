@@ -80,6 +80,18 @@ class _StagedPidState:
 
 
 def read_csv(path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
+    """
+    Read a CSV file and return its headers and rows.
+
+    Args:
+        path (Path): Path to the input file or directory.
+
+    Returns:
+        Tuple[List[str], List[Dict[str, str]]]: Tuple containing the CSV headers and row dictionaries.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     try:
         with path.open("r", newline="", encoding="utf-8-sig") as handle:
             reader = csv.DictReader(handle)
@@ -95,6 +107,20 @@ def read_csv(path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
 
 
 def atomic_write(path: Path, fields: Sequence[str], rows: Iterable[Dict[str, str]]) -> None:
+    """
+    Write CSV fields and rows through a temporary file and atomic replace.
+
+    Args:
+        path (Path): Path to the input file or directory.
+        fields (Sequence[str]): Field or column metadata used by the operation.
+        rows (Iterable[Dict[str, str]]): Data rows to process.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     try:
@@ -115,6 +141,16 @@ def atomic_write(path: Path, fields: Sequence[str], rows: Iterable[Dict[str, str
 
 
 def atomic_write_json(path: Path, payload: Dict[str, object]) -> None:
+    """
+    Write JSON content through a temporary file and atomic replace.
+
+    Args:
+        path (Path): Path to the input file or directory.
+        payload (Dict[str, object]): Input payload to validate, transform, or persist.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     try:
@@ -129,7 +165,19 @@ def atomic_write_json(path: Path, payload: Dict[str, object]) -> None:
 
 
 def initialize_csv(path: Path, fields: Sequence[str]) -> None:
-    """Atomically create a header-only CSV without replacing an existing file."""
+    """
+    Atomically create a header-only CSV without replacing an existing file.
+
+    Args:
+        path (Path): Path to the input file or directory.
+        fields (Sequence[str]): Field or column metadata used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     if path.exists():
         return
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -150,7 +198,18 @@ def initialize_csv(path: Path, fields: Sequence[str]) -> None:
 
 
 def initialize_clone(clone_root: Path) -> None:
-    """Create CoPath CSVs and migrate legacy indexes/report columns."""
+    """
+    Create CoPath CSVs and migrate legacy indexes/report columns.
+
+    Args:
+        clone_root (Path): Directory used as the clone root.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     for organ in ORGANS:
         path = clone_root / organ / "copath_data.csv"
         initialize_csv(path, COPATH_FIELDS)
@@ -205,6 +264,15 @@ def initialize_clone(clone_root: Path) -> None:
 
 
 def _retire_legacy_identifier_indexes(clone_root: Path) -> None:
+    """
+    Remove obsolete identifier index files from a clone.
+
+    Args:
+        clone_root (Path): Directory used as the clone root.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     backup_root = clone_root / "migration_backups" / "identifier_indexes"
     for name in ("all_accessions.csv", "all_mrns.csv"):
         legacy = clone_root / name
@@ -218,6 +286,18 @@ def _retire_legacy_identifier_indexes(clone_root: Path) -> None:
 
 
 def _validate_identifiers(rows: Sequence[Dict[str, str]]) -> None:
+    """
+    Validate identifier rows before they are written to a clone.
+
+    Args:
+        rows (Sequence[Dict[str, str]]): Data rows to process.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     accessions: set = set()
     mrn_organ: Dict[Tuple[str, str], str] = {}
     organ_pid: Dict[Tuple[str, str], str] = {}
@@ -248,6 +328,15 @@ def _validate_identifiers(rows: Sequence[Dict[str, str]]) -> None:
 
 
 def _identifier_rows(clone_root: Path) -> List[Dict[str, str]]:
+    """
+    Load identifier rows from a clone database or file set.
+
+    Args:
+        clone_root (Path): Directory used as the clone root.
+
+    Returns:
+        List[Dict[str, str]]: Collection produced from the supplied input or stored state.
+    """
     initialize_clone(clone_root)
     _, rows = read_csv(clone_root / "all_iuh_identifiers.csv")
     _validate_identifiers(rows)
@@ -255,7 +344,15 @@ def _identifier_rows(clone_root: Path) -> List[Dict[str, str]]:
 
 
 def compile_report(row: Dict[str, str]) -> str:
-    """Return one readable report value from current or legacy CoPath fields."""
+    """
+    Return one readable report value from current or legacy CoPath fields.
+
+    Args:
+        row (Dict[str, str]): One data row to process.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     existing = (row.get("report") or "").strip()
     if existing:
         return existing
@@ -268,7 +365,15 @@ def compile_report(row: Dict[str, str]) -> str:
 
 
 def collapse_report_fields(row: Dict[str, str]) -> Dict[str, str]:
-    """Replace legacy per-section report values with one report value."""
+    """
+    Replace legacy per-section report values with one report value.
+
+    Args:
+        row (Dict[str, str]): One data row to process.
+
+    Returns:
+        Dict[str, str]: Collection produced from the supplied input or stored state.
+    """
     collapsed = {
         field: value for field, value in row.items() if field not in REPORT_FIELDS
     }
@@ -277,7 +382,15 @@ def collapse_report_fields(row: Dict[str, str]) -> Dict[str, str]:
 
 
 def collapse_report_headers(fields: Sequence[str]) -> List[str]:
-    """Replace legacy report headers with one report header in the same position."""
+    """
+    Replace legacy report headers with one report header in the same position.
+
+    Args:
+        fields (Sequence[str]): Field or column metadata used by the operation.
+
+    Returns:
+        List[str]: Collection produced from the supplied input or stored state.
+    """
     collapsed: List[str] = []
     report_added = False
     for field in fields:
@@ -296,32 +409,94 @@ def collapse_report_headers(fields: Sequence[str]) -> List[str]:
 
 
 def clean_accession(value: object) -> str:
-    """Preserve accession spelling while removing surrounding whitespace."""
+    """
+    Preserve accession spelling while removing surrounding whitespace.
+
+    Args:
+        value (object): Input value to validate, transform, or persist.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     return str(value or "").strip()
 
 
 def accession_key(value: object) -> str:
-    """Return the case-insensitive identity key for an accession."""
+    """
+    Return the case-insensitive identity key for an accession.
+
+    Args:
+        value (object): Input value to validate, transform, or persist.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     return clean_accession(value).casefold()
 
 
 def row_accession(row: Dict[str, str]) -> str:
+    """
+    Return the cleaned accession value from a mapping row.
+
+    Args:
+        row (Dict[str, str]): One data row to process.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     return clean_accession(row.get("AccessionID") or row.get("accession_id"))
 
 
 def row_accession_key(row: Dict[str, str]) -> str:
+    """
+    Return the case-insensitive accession key from a mapping row.
+
+    Args:
+        row (Dict[str, str]): One data row to process.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     return accession_key(row_accession(row))
 
 
 def same_accession(left: object, right: object) -> bool:
+    """
+    Compare two accession values by normalized identity.
+
+    Args:
+        left (object): Input left used by the operation.
+        right (object): Input right used by the operation.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+    """
     return accession_key(left) == accession_key(right)
 
 
 def parse_bool(value: str) -> bool:
+    """
+    Parse a stored boolean value and reject unsupported text.
+
+    Args:
+        value (str): Input value to validate, transform, or persist.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+    """
     return str(value).strip().lower() == "true"
 
 
 def clean_date(value: str) -> str:
+    """
+    Normalize a date value to the mapping date representation.
+
+    Args:
+        value (str): Input value to validate, transform, or persist.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     value = (value or "").strip()
     if not value:
         return "XXXXXXXX"
@@ -343,6 +518,15 @@ def clean_date(value: str) -> str:
 
 MENINGES_TERMS = ["meninges", "meningioma"]
 def derive_organ(row: Optional[Dict[str, str]]) -> str:
+    """
+    Derive an organ label from a mapping row.
+
+    Args:
+        row (Optional[Dict[str, str]]): One data row to process.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     if row is None:
         return "UNKNOWN"
     text = (row.get("sample_acquisition_type") or "").lower()
@@ -360,6 +544,15 @@ def derive_organ(row: Optional[Dict[str, str]]) -> str:
 
 RESECTION_TERMS = ["resection", "excision"]
 def derive_sample_type(row: Optional[Dict[str, str]]) -> str:
+    """
+    Derive a sample type from a mapping row.
+
+    Args:
+        row (Optional[Dict[str, str]]): One data row to process.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     if row is None:
         return "XX"
     text = " ".join(
@@ -374,6 +567,18 @@ def derive_sample_type(row: Optional[Dict[str, str]]) -> str:
 
 
 def increment_pid(pid: str) -> str:
+    """
+    Return the next PID value after incrementing its numeric suffix.
+
+    Args:
+        pid (str): Input PID used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     if not PID_RE.fullmatch(pid):
         return "AAAAAA"
     chars = list(pid)
@@ -387,15 +592,42 @@ def increment_pid(pid: str) -> str:
 
 
 def mapping_signature(rows: Sequence[Dict[str, str]]) -> str:
+    """
+    Calculate a stable signature for mapping rows.
+
+    Args:
+        rows (Sequence[Dict[str, str]]): Data rows to process.
+
+    Returns:
+        str: Stable hash identifying the supplied mapping rows.
+    """
     payload = "\n".join("\x1f".join(row.get(field, "") for field in MAPPING_FIELDS) for row in rows)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def safe_component(value: str) -> bool:
+    """
+    Check whether a value is safe as one path component.
+
+    Args:
+        value (str): Input value to validate, transform, or persist.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+    """
     return bool(value) and not re.search(r"[\\/:*?\"<>|\x00-\x1f]", value)
 
 
 def build_new_name(row: Dict[str, str]) -> str:
+    """
+    Build the canonical renamed filename for a mapping row.
+
+    Args:
+        row (Dict[str, str]): One data row to process.
+
+    Returns:
+        str: Canonical filename for the supplied mapping row.
+    """
     suffix = Path(row["OriginalPath"]).suffix
     return (
         f"{row['Organ']}_{row['PID']}_{row['AccessionDate']}_{row['Timepoint']}_"
@@ -405,6 +637,15 @@ def build_new_name(row: Dict[str, str]) -> str:
 
 
 def validate_mapping_rows(rows: Sequence[Dict[str, str]]) -> List[str]:
+    """
+    Validate mapping rows and return all detected errors.
+
+    Args:
+        rows (Sequence[Dict[str, str]]): Data rows to process.
+
+    Returns:
+        List[str]: Collection produced from the supplied input or stored state.
+    """
     errors: List[str] = []
     names = []
     for row in rows:
@@ -444,6 +685,15 @@ def validate_mapping_rows(rows: Sequence[Dict[str, str]]) -> List[str]:
 
 
 def _clone_rows(clone_root: Path) -> Tuple[Dict[str, str], Dict[str, List[Dict[str, str]]], Dict[str, List[str]]]:
+    """
+    Load clone mapping rows and their associated reports and identifiers.
+
+    Args:
+        clone_root (Path): Directory used as the clone root.
+
+    Returns:
+        Tuple[Dict[str, str], Dict[str, List[Dict[str, str]]], Dict[str, List[str]]]: Collection produced from the supplied input or stored state.
+    """
     initialize_clone(clone_root)
     _, rows = read_csv(clone_root / "all_iuh_identifiers.csv")
     accession_org = {
@@ -461,6 +711,15 @@ def _clone_rows(clone_root: Path) -> Tuple[Dict[str, str], Dict[str, List[Dict[s
 
 
 def _reserved_pids(batch_base: Path) -> Dict[str, set]:
+    """
+    Collect PID values reserved by existing batch data.
+
+    Args:
+        batch_base (Path): Input batch base used by the operation.
+
+    Returns:
+        Dict[str, set]: Collection produced from the supplied input or stored state.
+    """
     result = {organ: set() for organ in ORGANS}
     if not batch_base.exists():
         return result
@@ -488,7 +747,16 @@ def _reserved_pids(batch_base: Path) -> Dict[str, set]:
 def _staged_pid_state(
     batch_base: Path, identifiers: Sequence[Dict[str, str]]
 ) -> _StagedPidState:
-    """Load active staged PID observations and their writable source rows."""
+    """
+    Load active staged PID observations and their writable source rows.
+
+    Args:
+        batch_base (Path): Input batch base used by the operation.
+        identifiers (Sequence[Dict[str, str]]): Input identifiers used by the operation.
+
+    Returns:
+        _StagedPidState: Value produced by the operation.
+    """
     mappings = {}
     histories = {}
     observations = []
@@ -558,7 +826,17 @@ def _canonical_pid_pairs(
     identifiers: Sequence[Dict[str, str]],
     staged: _StagedPidState,
 ) -> Dict[Tuple[str, str], str]:
-    """Return one collision-free PID for every committed or staged pair."""
+    """
+    Return one collision-free PID for every committed or staged pair.
+
+    Args:
+        batch_base (Path): Input batch base used by the operation.
+        identifiers (Sequence[Dict[str, str]]): Input identifiers used by the operation.
+        staged (_StagedPidState): Input staged used by the operation.
+
+    Returns:
+        Dict[Tuple[str, str], str]: Collection produced from the supplied input or stored state.
+    """
     pairs: Dict[Tuple[str, str], str] = {}
     owners: Dict[Tuple[str, str], str] = {}
     reserved = _reserved_pids(batch_base)
@@ -609,13 +887,31 @@ def _canonical_pid_pairs(
 def _pid_pairs(
     batch_base: Path, identifiers: Sequence[Dict[str, str]]
 ) -> Dict[Tuple[str, str], str]:
-    """Return canonical committed and staged PIDs keyed by (MRN, organ)."""
+    """
+    Return canonical committed and staged PIDs keyed by (MRN, organ).
+
+    Args:
+        batch_base (Path): Input batch base used by the operation.
+        identifiers (Sequence[Dict[str, str]]): Input identifiers used by the operation.
+
+    Returns:
+        Dict[Tuple[str, str], str]: Collection produced from the supplied input or stored state.
+    """
     staged = _staged_pid_state(batch_base, identifiers)
     return _canonical_pid_pairs(batch_base, identifiers, staged)
 
 
 def repair_staged_pid_assignments(clone_root: Path, batch_base: Path) -> int:
-    """Persist canonical PIDs across active staged mappings and history rows."""
+    """
+    Persist canonical PIDs across active staged mappings and history rows.
+
+    Args:
+        clone_root (Path): Directory used as the clone root.
+        batch_base (Path): Input batch base used by the operation.
+
+    Returns:
+        int: Count, status, or numeric result produced by the operation.
+    """
     identifiers = _identifier_rows(clone_root)
     staged = _staged_pid_state(batch_base, identifiers)
     pairs = _canonical_pid_pairs(batch_base, identifiers, staged)
@@ -674,7 +970,23 @@ def pid_after_organ_change(
     target_organ: str,
     additional_reserved: Iterable[str] = (),
 ) -> str:
-    """Resolve authoritative PID after a staged accession changes organ."""
+    """
+    Resolve authoritative PID after a staged accession changes organ.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+        clone_root (Path): Directory used as the clone root.
+        batch_base (Path): Input batch base used by the operation.
+        accession (str): Input accession used by the operation.
+        target_organ (str): Input target organ used by the operation.
+        additional_reserved (Iterable[str]): Input additional reserved used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     accession = clean_accession(accession)
     target_organ = target_organ.strip().upper()
     if not accession:
@@ -719,6 +1031,19 @@ def _pid_for_identifiers(
     row: Optional[Dict[str, str]], organ: str, identifiers: Sequence[Dict[str, str]],
     used: set, pairs: Optional[Dict[Tuple[str, str], str]] = None,
 ) -> str:
+    """
+    Choose a collision-free PID for an identifier pair.
+
+    Args:
+        row (Optional[Dict[str, str]]): One data row to process.
+        organ (str): Input organ used by the operation.
+        identifiers (Sequence[Dict[str, str]]): Input identifiers used by the operation.
+        used (set): Input used used by the operation.
+        pairs (Optional[Dict[Tuple[str, str], str]]): Input pairs used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     mrn = (row or {}).get("mrn", "").strip()
     key = (mrn, organ)
     if mrn and pairs is not None and key in pairs:
@@ -753,7 +1078,21 @@ def direct_query(
     batch_root: Path, accessions: Sequence[str], output_path: Path,
     scope: str = "exact_accession",
 ) -> None:
-    """Run the legacy CoPath CLI in this process environment."""
+    """
+    Run the legacy CoPath CLI in this process environment.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+        accessions (Sequence[str]): Identifier values to process.
+        output_path (Path): Path to the output.
+        scope (str): Requested query or API scope.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     if not accessions:
         atomic_write(output_path, ["accession_id"], [])
         return
@@ -780,7 +1119,21 @@ def windows_queue_query(
     _batch_root: Path, accessions: Sequence[str], output_path: Path,
     scope: str = "exact_accession",
 ) -> None:
-    """Submit a constrained request to the manually started Windows worker."""
+    """
+    Submit a constrained request to the manually started Windows worker.
+
+    Args:
+        _batch_root (Path): Directory used as the batch root.
+        accessions (Sequence[str]): Identifier values to process.
+        output_path (Path): Path to the output.
+        scope (str): Requested query or API scope.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     if not accessions:
         atomic_write(output_path, ["accession_id"], [])
         return
@@ -805,7 +1158,20 @@ def windows_queue_query(
 
 
 def default_query(batch_root: Path, accessions: Sequence[str], output_path: Path) -> None:
-    """Dispatch CoPath work according to the configured query mode."""
+    """
+    Dispatch CoPath work according to the configured query mode.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+        accessions (Sequence[str]): Identifier values to process.
+        output_path (Path): Path to the output.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     mode = os.environ.get("COPATH_QUERY_MODE", "direct").strip().lower()
     if mode == "direct":
         direct_query(batch_root, accessions, output_path)
@@ -820,6 +1186,20 @@ def default_query(batch_root: Path, accessions: Sequence[str], output_path: Path
 def default_history_query(
     batch_root: Path, accessions: Sequence[str], output_path: Path
 ) -> None:
+    """
+    Run the default longitudinal history query for a batch.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+        accessions (Sequence[str]): Identifier values to process.
+        output_path (Path): Path to the output.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     mode = os.environ.get("COPATH_QUERY_MODE", "direct").strip().lower()
     if mode == "direct":
         direct_query(batch_root, accessions, output_path, "patient_history")
@@ -830,6 +1210,18 @@ def default_history_query(
 
 
 def read_history_job(batch_root: Path) -> Dict[str, object]:
+    """
+    Read the persisted longitudinal history-job descriptor.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+
+    Returns:
+        Dict[str, object]: Collection produced from the supplied input or stored state.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     path = batch_root / "copath_history_job.json"
     if not path.exists():
         return {"version": 1, "status": "not_needed", "attempts": 0, "seed_accessions": []}
@@ -843,6 +1235,16 @@ def read_history_job(batch_root: Path) -> Dict[str, object]:
 
 
 def _update_longitudinal_log(batch_root: Path, error: str) -> None:
+    """
+    Record an error in the longitudinal history log.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+        error (str): Exception information supplied by the runtime.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     path = batch_root / "copath_longitudinal_jobs.csv"
     if not path.exists():
         return
@@ -858,6 +1260,18 @@ def stage_longitudinal_history(
     batch_base: Path,
     query: Callable[[Path, Sequence[str], Path], None] = default_history_query,
 ) -> None:
+    """
+    Query and stage longitudinal history data for a batch.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+        clone_root (Path): Directory used as the clone root.
+        batch_base (Path): Input batch base used by the operation.
+        query (Callable[[Path, Sequence[str], Path], None]): Query or query template to execute or format.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     job_path = batch_root / "copath_history_job.json"
     job = read_history_job(batch_root)
     seeds = [str(value) for value in job.get("seed_accessions", [])]
@@ -940,6 +1354,21 @@ def prepare_batch(
     batch_base: Path,
     query: Callable[[Path, Sequence[str], Path], None] = default_query,
 ) -> None:
+    """
+    Prepare mapping rows and reports for a renaming batch.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+        clone_root (Path): Directory used as the clone root.
+        batch_base (Path): Input batch base used by the operation.
+        query (Callable[[Path, Sequence[str], Path], None]): Query or query template to execute or format.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     repair_staged_pid_assignments(clone_root, batch_base)
     enriched_path = batch_root / "enriched.csv"
     _, slides = read_csv(enriched_path)
@@ -1054,6 +1483,16 @@ def prepare_batch(
 
 
 def report_rows(batch_root: Path, clone_root: Path) -> Dict[str, Dict[str, str]]:
+    """
+    Load report values keyed by accession for a renaming batch.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+        clone_root (Path): Directory used as the clone root.
+
+    Returns:
+        Dict[str, Dict[str, str]]: Collection produced from the supplied input or stored state.
+    """
     result: Dict[str, Dict[str, str]] = {}
     pending = batch_root / "pending_CoPath_data.csv"
     if pending.exists():
@@ -1073,6 +1512,16 @@ def report_rows(batch_root: Path, clone_root: Path) -> Dict[str, Dict[str, str]]
 
 
 def group_mapping(rows: Sequence[Dict[str, str]], reports: Dict[str, Dict[str, str]]) -> List[Dict[str, object]]:
+    """
+    Group mapping rows with their associated CoPath reports.
+
+    Args:
+        rows (Sequence[Dict[str, str]]): Data rows to process.
+        reports (Dict[str, Dict[str, str]]): Input reports used by the operation.
+
+    Returns:
+        List[Dict[str, object]]: Collection produced from the supplied input or stored state.
+    """
     grouped: Dict[str, List[Dict[str, str]]] = defaultdict(list)
     display_accessions: Dict[str, str] = {}
     for row in rows:
@@ -1092,7 +1541,15 @@ def group_mapping(rows: Sequence[Dict[str, str]], reports: Dict[str, Dict[str, s
 
 
 def renumber_merged_mapping(rows: Sequence[Dict[str, str]]) -> None:
-    """Assign unique section numbers and names after accession groups merge."""
+    """
+    Assign unique section numbers and names after accession groups merge.
+
+    Args:
+        rows (Sequence[Dict[str, str]]): Data rows to process.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     counters: Dict[Tuple[str, ...], int] = defaultdict(int)
     for row in rows:
         key = (
@@ -1108,6 +1565,22 @@ def update_group(
     mapping_path: Path, old_accession: str, values: Dict[str, str], slide_values: Dict[str, Dict[str, str]],
     expected_signature: str,
 ) -> Tuple[List[Dict[str, str]], bool]:
+    """
+    Update one accession mapping group after verifying its signature.
+
+    Args:
+        mapping_path (Path): Path to the mapping.
+        old_accession (str): Input old accession used by the operation.
+        values (Dict[str, str]): Input values to validate, transform, or persist.
+        slide_values (Dict[str, Dict[str, str]]): Input slide values used by the operation.
+        expected_signature (str): Input expected signature used by the operation.
+
+    Returns:
+        Tuple[List[Dict[str, str]], bool]: Collection produced from the supplied input or stored state.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     _, rows = read_csv(mapping_path)
     if mapping_signature(rows) != expected_signature:
         raise RenamingError("The mapping changed in another session; reload and try again")
@@ -1159,6 +1632,23 @@ def retry_group(
     new_accession: str,
     query: Callable[[Path, Sequence[str], Path], None] = default_query,
 ) -> None:
+    """
+    Retry one accession-group renaming operation with a corrected accession.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+        clone_root (Path): Directory used as the clone root.
+        batch_base (Path): Input batch base used by the operation.
+        old_accession (str): Input old accession used by the operation.
+        new_accession (str): Input new accession used by the operation.
+        query (Callable[[Path, Sequence[str], Path], None]): Query or query template to execute or format.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        RenamingError: If validation or the underlying resource operation fails.
+    """
     repair_staged_pid_assignments(clone_root, batch_base)
     old_accession = clean_accession(old_accession)
     new_accession = clean_accession(new_accession)
@@ -1307,6 +1797,16 @@ def retry_group(
 
 
 def finalize_batch(batch_root: Path, clone_root: Path) -> None:
+    """
+    Finalize a renaming batch after all mappings are approved.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+        clone_root (Path): Directory used as the clone root.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     mapping_path = batch_root / "name_mapping.csv"
     _, mapping = read_csv(mapping_path)
     if not mapping or not all(parse_bool(row["Approved"]) for row in mapping):

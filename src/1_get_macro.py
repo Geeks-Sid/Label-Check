@@ -20,6 +20,16 @@ try:
     from tqdm import tqdm
 except ImportError:
     def tqdm(iterable, **_kwargs):
+        """
+        Return the iterable unchanged when the optional progress-bar dependency is unavailable.
+
+        Args:
+            iterable (object): Input iterable used by the operation.
+            **_kwargs (object): Input kwargs used by the operation.
+
+        Returns:
+            object: Value produced by the operation.
+        """
         return iterable
 
 
@@ -36,6 +46,13 @@ DEFAULT_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "tif", "tiff", "bmp"]
 def write_mapping_csv(results: list[dict], csv_path: Path):
     """
     Writes the stage-1 mapping CSV shared by both input modes.
+
+    Args:
+        results (list[dict]): Input results used by the operation.
+        csv_path (Path): Path to the CSV.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     logger.info(f"Writing mapping to {csv_path}...")
     try:
@@ -67,6 +84,19 @@ def extract_associated_images(
 ):
     """
     Extracts associated images (macro, label, thumbnail) from a single WSI file.
+
+    Args:
+        svs_path (Path): Path to the SVS.
+        input_dir (Path): Directory used as the input dir.
+        output_dir (Path): Directory used as the output dir.
+        maintain_structure (bool): Input maintain structure used by the operation.
+        thumbnail_size (tuple): Input thumbnail size used by the operation.
+
+    Returns:
+        object: Value produced by the operation.
+
+    Raises:
+        ImportError: If validation or the underlying resource operation fails.
     """
     try:
         if openslide is None:
@@ -117,6 +147,17 @@ def process_slide_files(
 ):
     """
     Finds and processes WSI files recursively using a thread pool.
+
+    Args:
+        input_dir (Path): Directory used as the input dir.
+        output_dir (Path): Directory used as the output dir.
+        csv_path (Path): Path to the CSV.
+        extensions (list): Input extensions used by the operation.
+        num_workers (int): Numeric limit, duration, or count controlling the operation.
+        thumbnail_size (tuple): Input thumbnail size used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     logger.info(f"Scanning for files with extensions {extensions} in {input_dir}...")
 
@@ -169,6 +210,13 @@ def process_slide_files(
 def normalize_image_stem(path: Path, image_type: str) -> str:
     """
     Normalizes a label or macro filename stem for cross-directory pairing.
+
+    Args:
+        path (Path): Path to the input file or directory.
+        image_type (str): Input image type used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
     """
     suffix = f"_{image_type}"
     stem = path.stem
@@ -184,6 +232,14 @@ def scan_image_dir(
 ) -> dict[str, Path]:
     """
     Scans one image subtree and returns normalized stem -> source path mappings.
+
+    Args:
+        image_dir (Path): Directory used as the image dir.
+        image_type (str): Input image type used by the operation.
+        extensions (list[str]): Input extensions used by the operation.
+
+    Returns:
+        dict[str, Path]: Value produced by the operation.
     """
     files = []
     for ext in extensions:
@@ -212,6 +268,15 @@ def build_canonical_output_path(
 ) -> Path:
     """
     Builds the copied image path for image-directory mode.
+
+    Args:
+        output_dir (Path): Directory used as the output dir.
+        image_type (str): Input image type used by the operation.
+        normalized_stem (str): Input normalized stem used by the operation.
+        source_path (Path): Path to the source.
+
+    Returns:
+        Path: Filesystem path produced by the operation.
     """
     stem_path = Path(normalized_stem)
     filename = f"{stem_path.name}_{image_type}{source_path.suffix.lower()}"
@@ -227,6 +292,15 @@ def process_image_files(
     """
     Pairs label/macro images from an image-directory input tree and copies them to
     the standard output layout.
+
+    Args:
+        input_dir (Path): Directory used as the input dir.
+        output_dir (Path): Directory used as the output dir.
+        csv_path (Path): Path to the CSV.
+        extensions (list[str]): Input extensions used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     label_dir = input_dir / "label"
     macro_dir = input_dir / "macro"
@@ -283,6 +357,13 @@ def process_image_files(
 def detect_input_mode(input_dir: Path, requested_mode: str) -> str:
     """
     Chooses the effective stage-1 input mode.
+
+    Args:
+        input_dir (Path): Directory used as the input dir.
+        requested_mode (str): Input requested mode used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
     """
     if requested_mode != "auto":
         return requested_mode

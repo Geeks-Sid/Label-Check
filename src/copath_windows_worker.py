@@ -39,6 +39,16 @@ TERMINAL_RETENTION_SECONDS = 24 * 60 * 60
 
 class WorkerJobError(RuntimeError):
     def __init__(self, code: str, safe_message: str):
+        """
+        Initialize a worker error with a machine code and safe message.
+
+        Args:
+            code (str): Input code used by the operation.
+            safe_message (str): Input safe message used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         super().__init__(safe_message)
         self.code = code
         self.safe_message = safe_message
@@ -48,6 +58,15 @@ QueryRunner = Callable[..., None]
 
 
 def _remove_work_path(path: Path) -> None:
+    """
+    Remove a temporary worker path without following a symbolic link.
+
+    Args:
+        path (Path): Path to the input file or directory.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     if path.is_symlink() or path.is_file():
         path.unlink(missing_ok=True)
     elif path.is_dir():
@@ -61,6 +80,20 @@ class CoPathWindowsWorker:
         connection_string_file: Path,
         query_runner: Optional[QueryRunner] = None,
     ) -> None:
+        """
+        Initialize the Windows CoPath worker and its shared queue.
+
+        Args:
+            queue_root (Path): Directory used as the queue root.
+            connection_string_file (Path): Input filename or path for the connection string file.
+            query_runner (Optional[QueryRunner]): Input query runner used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            ValueError: If validation or the underlying resource operation fails.
+        """
         self.queue_root = Path(queue_root).resolve()
         self.connection_string_file = Path(connection_string_file).resolve()
         if not self.connection_string_file.is_file():
@@ -72,6 +105,12 @@ class CoPathWindowsWorker:
         self._heartbeat_thread: Optional[threading.Thread] = None
 
     def publish_heartbeat(self) -> None:
+        """
+        Publish a current Windows worker heartbeat artifact.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         atomic_write_json(self.queue_root / "worker.json", {
             "version": PROTOCOL_VERSION,
             "worker_id": self.worker_id,
@@ -79,6 +118,12 @@ class CoPathWindowsWorker:
         })
 
     def _heartbeat_loop(self) -> None:
+        """
+        Refresh the worker heartbeat until shutdown is requested.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         while not self._stop.is_set():
             try:
                 self.publish_heartbeat()
@@ -87,6 +132,12 @@ class CoPathWindowsWorker:
             self._stop.wait(HEARTBEAT_INTERVAL_SECONDS)
 
     def start_heartbeat(self) -> None:
+        """
+        Publish an initial heartbeat and start its refresh thread.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.publish_heartbeat()
         self._heartbeat_thread = threading.Thread(
             target=self._heartbeat_loop, name="copath-heartbeat", daemon=True
@@ -94,6 +145,12 @@ class CoPathWindowsWorker:
         self._heartbeat_thread.start()
 
     def stop(self) -> None:
+        """
+        Stop the worker heartbeat and release worker resources.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self._stop.set()
         if self._heartbeat_thread is not None:
             self._heartbeat_thread.join(timeout=HEARTBEAT_INTERVAL_SECONDS + 1)
@@ -109,6 +166,21 @@ class CoPathWindowsWorker:
         self, accessions: Sequence[str], output_path: Path, work_dir: Path,
         scope: str = "exact_accession",
     ) -> None:
+        """
+        Run the configured CoPath query command in an isolated work directory.
+
+        Args:
+            accessions (Sequence[str]): Identifier values to process.
+            output_path (Path): Path to the output.
+            work_dir (Path): Directory used as the work dir.
+            scope (str): Requested query or API scope.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            WorkerJobError: If validation or the underlying resource operation fails.
+        """
         input_path = work_dir / "accessions.csv"
         with input_path.open("x", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=["AccessionID"])
@@ -141,6 +213,16 @@ class CoPathWindowsWorker:
     def recover_stale_processing(
         self, now: Optional[dt.datetime] = None, max_age_seconds: float = CLAIM_RECOVERY_SECONDS
     ) -> int:
+        """
+        Return stale processing requests to the pending queue.
+
+        Args:
+            now (Optional[dt.datetime]): Reference time or date used for the operation.
+            max_age_seconds (float): Numeric limit, duration, or count controlling the operation.
+
+        Returns:
+            int: Number of processing requests recovered.
+        """
         current_timestamp = (now or utc_now()).timestamp()
         recovered = 0
         for claimed in self.paths["processing"].glob("*.json"):
@@ -166,6 +248,16 @@ class CoPathWindowsWorker:
     def cleanup_old_artifacts(
         self, now: Optional[dt.datetime] = None, max_age_seconds: float = TERMINAL_RETENTION_SECONDS
     ) -> int:
+        """
+        Remove terminal queue artifacts older than the retention period.
+
+        Args:
+            now (Optional[dt.datetime]): Reference time or date used for the operation.
+            max_age_seconds (float): Numeric limit, duration, or count controlling the operation.
+
+        Returns:
+            int: Number of terminal artifacts removed.
+        """
         current_timestamp = (now or utc_now()).timestamp()
         removed = 0
         for directory in ("results", "errors", "work"):
@@ -180,6 +272,17 @@ class CoPathWindowsWorker:
         return removed
 
     def _publish_error(self, request_id: str, code: str, message: str) -> None:
+        """
+        Publish a safe terminal error artifact for a queue request.
+
+        Args:
+            request_id (str): Input request id used by the operation.
+            code (str): Input code used by the operation.
+            message (str): Input message used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         if (self.paths["results"] / f"{request_id}.csv").exists():
             return
         atomic_write_json(self.paths["errors"] / f"{request_id}.json", {
@@ -190,6 +293,16 @@ class CoPathWindowsWorker:
         })
 
     def _publish_result(self, request_id: str, source: Path) -> None:
+        """
+        Atomically publish a validated query result CSV for a request.
+
+        Args:
+            request_id (str): Input request id used by the operation.
+            source (Path): Input source used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         destination = self.paths["results"] / f"{request_id}.csv"
         temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
         try:
@@ -199,6 +312,18 @@ class CoPathWindowsWorker:
             temporary.unlink(missing_ok=True)
 
     def process_claimed(self, claimed: Path) -> None:
+        """
+        Process one claimed queue request and publish its terminal artifact.
+
+        Args:
+            claimed (Path): Input claimed used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            WorkerJobError: If validation or the underlying resource operation fails.
+        """
         request_id = claimed.stem
         work_dir = self.paths["work"] / request_id
         try:
@@ -243,8 +368,23 @@ class CoPathWindowsWorker:
                 _remove_work_path(work_dir)
 
     def claim_one(self) -> Optional[Path]:
+        """
+        Claim the next eligible queue request by atomically moving it to processing.
+
+        Returns:
+            Optional[Path]: Claimed request path, or None when no request is ready.
+        """
         requests = list(self.paths["requests"].glob("*.json"))
         def priority(path: Path) -> tuple:
+            """
+            Return the scheduling priority for a queue request path.
+
+            Args:
+                path (Path): Path to the input file or directory.
+
+            Returns:
+                tuple: Tuple used to order queue requests.
+            """
             try:
                 payload = read_json(path)
                 return (payload.get("scope") == "patient_history", payload.get("created_at", ""), path.name)
@@ -264,6 +404,12 @@ class CoPathWindowsWorker:
         return None
 
     def run_once(self) -> bool:
+        """
+        Claim and process at most one queue request.
+
+        Returns:
+            bool: True when a request was processed; otherwise False.
+        """
         claimed = self.claim_one()
         if claimed is None:
             return False
@@ -271,6 +417,12 @@ class CoPathWindowsWorker:
         return True
 
     def run_forever(self) -> None:
+        """
+        Run worker maintenance and request processing until stopped.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.recover_stale_processing()
         self.cleanup_old_artifacts()
         last_maintenance = time.monotonic()
@@ -291,6 +443,12 @@ class CoPathWindowsWorker:
 
 
 def main() -> int:
+    """
+    Run the command-line entry point.
+
+    Returns:
+        int: Process exit status, where applicable.
+    """
     parser = argparse.ArgumentParser(description="Run the Windows-side CoPath query worker")
     parser.add_argument("--queue", required=True, type=Path, help="Shared CoPath queue directory")
     parser.add_argument(

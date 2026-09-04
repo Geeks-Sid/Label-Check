@@ -21,7 +21,21 @@ ocr_langs = None # Auto-detect
 # --- Modified processing function with INNER Try/Except and Traceback ---
 def process_single_image(patient, label_subdir, macro_subdir, csv_path,
                          det_predictor, rec_predictor, langs):
-    """Process a single patient's image, isolating predictor errors."""
+    """
+    Process a single patient's image, isolating predictor errors.
+
+    Args:
+        patient (object): Input patient used by the operation.
+        label_subdir (object): Input label subdir used by the operation.
+        macro_subdir (object): Input macro subdir used by the operation.
+        csv_path (object): Path to the CSV.
+        det_predictor (object): Input det predictor used by the operation.
+        rec_predictor (object): Input rec predictor used by the operation.
+        langs (object): Input langs used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     label_path = os.path.join(label_subdir, f"{patient}_label.png")
     macro_path = os.path.join(macro_subdir, f"{patient}_macro.png")
 
@@ -194,7 +208,17 @@ def process_single_image(patient, label_subdir, macro_subdir, csv_path,
 
 # --- process_image_files and Main Execution (Keep as before) ---
 def process_image_files(input_dir, csv_path, num_workers=4):
-    """Process all label and macro images in parallel using the NEW Surya-OCR API."""
+    """
+    Process all label and macro images in parallel using the NEW Surya-OCR API.
+
+    Args:
+        input_dir (object): Directory used as the input dir.
+        csv_path (object): Path to the CSV.
+        num_workers (object): Numeric limit, duration, or count controlling the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     label_subdir = os.path.join(input_dir, "label")
     macro_subdir = os.path.join(input_dir, "macro")
 

@@ -91,6 +91,15 @@ os.umask(0o077)
 
 
 def _environment_paths(name: str) -> Tuple[str, ...]:
+    """
+    Read a path-separator-delimited environment variable into cleaned path entries.
+
+    Args:
+        name (str): Input name used by the operation.
+
+    Returns:
+        Tuple[str, ...]: Tuple of cleaned path strings from the environment variable.
+    """
     return tuple(
         item.strip()
         for item in os.environ.get(name, "").split(os.pathsep)
@@ -207,6 +216,18 @@ class Config:
 
 
 def _make_private_directory(path: Union[str, Path]) -> Path:
+    """
+    Create a runtime directory and enforce private permissions.
+
+    Args:
+        path (Union[str, Path]): Path to the input file or directory.
+
+    Returns:
+        Path: Path to the created private directory.
+
+    Raises:
+        RuntimeError: If validation or the underlying resource operation fails.
+    """
     directory = Path(path)
     if directory.is_symlink():
         raise RuntimeError(f"Sensitive runtime directory cannot be a symbolic link: {directory}")
@@ -216,7 +237,16 @@ def _make_private_directory(path: Union[str, Path]) -> Path:
 
 
 def _set_private_mode(path: Path, expected_mode: int) -> bool:
-    """Apply POSIX mode, tolerating unsupported Docker Desktop bind mounts."""
+    """
+    Apply POSIX mode, tolerating unsupported Docker Desktop bind mounts.
+
+    Args:
+        path (Path): Path to the input file or directory.
+        expected_mode (int): Input expected mode used by the operation.
+
+    Returns:
+        bool: True when permissions were applied; False for supported bind-mount limitations.
+    """
     try:
         os.chmod(path, expected_mode)
         return True
@@ -236,6 +266,19 @@ def _set_private_mode(path: Path, expected_mode: int) -> bool:
 
 
 def _verify_private_mode(path: Path, expected_mode: int) -> None:
+    """
+    Verify that a sensitive path has the expected private permissions.
+
+    Args:
+        path (Path): Path to the input file or directory.
+        expected_mode (int): Input expected mode used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        RuntimeError: If validation or the underlying resource operation fails.
+    """
     if os.name == "nt":
         return
     actual_mode = stat.S_IMODE(path.stat().st_mode)
@@ -248,7 +291,19 @@ def _verify_private_mode(path: Path, expected_mode: int) -> None:
 def harden_runtime_permissions(
     instance_dir: Union[str, Path], log_dir: Union[str, Path]
 ) -> None:
-    """Create and repair private application state without following symlinks."""
+    """
+    Create and repair private application state without following symlinks.
+
+    Args:
+        instance_dir (Union[str, Path]): Directory used as the instance dir.
+        log_dir (Union[str, Path]): Directory used as the log dir.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        RuntimeError: If validation or the underlying resource operation fails.
+    """
     instance = _make_private_directory(instance_dir)
     logs = _make_private_directory(log_dir)
 
@@ -289,7 +344,15 @@ def harden_runtime_permissions(
 # 3. LOGGING SETUP
 # ==============================================================================
 def setup_logging(app: Flask) -> None:
-    """Configures comprehensive logging for the application."""
+    """
+    Configures comprehensive logging for the application.
+
+    Args:
+        app (Flask): Input app used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     log_dir = _make_private_directory(app.config["APP_LOG_DIR"])
     log_path = log_dir / "app.log"
     file_handler = RotatingFileHandler(log_path, maxBytes=102400, backupCount=10)
@@ -378,6 +441,15 @@ MAX_PASSWORD_LENGTH = 128
 
 
 def password_policy_error(password: Any) -> Optional[str]:
+    """
+    Validate a password against the application password policy.
+
+    Args:
+        password (Any): Input password used by the operation.
+
+    Returns:
+        Optional[str]: An error message when the password is invalid, otherwise None.
+    """
     if not isinstance(password, str):
         return "Password must be text."
     if len(password) < MIN_PASSWORD_LENGTH:
@@ -390,7 +462,18 @@ def password_policy_error(password: Any) -> Optional[str]:
 
 
 def validate_security_config(configuration: Optional[Dict[str, Any]] = None) -> None:
-    """Reject missing, weak, or documented-placeholder production credentials."""
+    """
+    Reject missing, weak, or documented-placeholder production credentials.
+
+    Args:
+        configuration (Optional[Dict[str, Any]]): Input configuration used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        SecurityConfigurationError: If validation or the underlying resource operation fails.
+    """
     if configuration is None:
         configuration = app.config
     errors = []
@@ -427,10 +510,25 @@ def validate_security_config(configuration: Optional[Dict[str, Any]] = None) -> 
 
 
 def _utcnow() -> datetime.datetime:
+    """
+    Return the current timezone-aware UTC datetime.
+
+    Returns:
+        datetime.datetime: Timezone-aware UTC datetime.
+    """
     return datetime.datetime.now(datetime.timezone.utc)
 
 
 def _iso_utc(value: Optional[datetime.datetime] = None) -> str:
+    """
+    Format a datetime as an ISO 8601 UTC timestamp.
+
+    Args:
+        value (Optional[datetime.datetime]): Input value to validate, transform, or persist.
+
+    Returns:
+        str: ISO 8601 timestamp ending in Z.
+    """
     return (value or _utcnow()).isoformat().replace("+00:00", "Z")
 
 
@@ -438,17 +536,43 @@ class APIStore:
     """SQLite-backed API credentials, durable job metadata, and rate counters."""
 
     def __init__(self, db_path: str, output_dir: str):
+        """
+        Initialize the APIStore instance.
+
+        Args:
+            db_path (str): Path to the DB.
+            output_dir (str): Directory used as the output dir.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.db_path = db_path
         self.output_dir = output_dir
         self._initialized_path: Optional[str] = None
         self._init_lock = threading.Lock()
 
     def configure(self, db_path: str, output_dir: str) -> None:
+        """
+        Update API-store paths and invalidate cached schema initialization.
+
+        Args:
+            db_path (str): Path to the DB.
+            output_dir (str): Directory used as the output dir.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.db_path = db_path
         self.output_dir = output_dir
         self._initialized_path = None
 
     def _connect(self) -> sqlite3.Connection:
+        """
+        Open a configured SQLite connection after ensuring its schema exists.
+
+        Returns:
+            sqlite3.Connection: Open SQLite connection configured for the API store.
+        """
         self._ensure_schema()
         connection = sqlite3.connect(self.db_path, timeout=30)
         connection.row_factory = sqlite3.Row
@@ -456,6 +580,12 @@ class APIStore:
 
     @contextlib.contextmanager
     def connection(self):
+        """
+        Provide a transaction-managed API-store connection context.
+
+        Yields:
+            object: Context-managed API-store SQLite connection.
+        """
         connection = self._connect()
         try:
             with connection:
@@ -464,6 +594,15 @@ class APIStore:
             connection.close()
 
     def _ensure_schema(self) -> None:
+        """
+        Create the API-store schema and secure its runtime paths when needed.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            RuntimeError: If validation or the underlying resource operation fails.
+        """
         if self._initialized_path == self.db_path:
             return
         with self._init_lock:
@@ -538,6 +677,18 @@ class APIStore:
     def create_token(
         self, user_id: str, label: str, scopes: List[str], expires_days: int
     ) -> Tuple[str, Dict[str, Any]]:
+        """
+        Generate, hash, and persist a scoped API token.
+
+        Args:
+            user_id (str): Identifier of the user associated with the operation.
+            label (str): Input label used by the operation.
+            scopes (List[str]): Input scopes used by the operation.
+            expires_days (int): Numeric limit, duration, or count controlling the operation.
+
+        Returns:
+            Tuple[str, Dict[str, Any]]: Raw token string and public token metadata dictionary.
+        """
         token_id = uuid.uuid4().hex[:16]
         raw_token = f"lc_pat_{token_id}.{secrets.token_urlsafe(32)}"
         created = _utcnow()
@@ -570,6 +721,15 @@ class APIStore:
         return raw_token, record
 
     def list_tokens(self, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Load API token metadata, optionally limited to one user.
+
+        Args:
+            user_id (Optional[str]): Identifier of the user associated with the operation.
+
+        Returns:
+            List[Dict[str, Any]]: Collection produced from the supplied input or stored state.
+        """
         query = "SELECT * FROM api_tokens"
         params: Tuple[Any, ...] = ()
         if user_id:
@@ -582,6 +742,15 @@ class APIStore:
 
     @staticmethod
     def _token_record(row: sqlite3.Row) -> Dict[str, Any]:
+        """
+        Convert a SQLite token row to its public metadata dictionary.
+
+        Args:
+            row (sqlite3.Row): One data row to process.
+
+        Returns:
+            Dict[str, Any]: Collection produced from the supplied input or stored state.
+        """
         return {
             "token_id": row["token_id"],
             "user_id": row["user_id"],
@@ -594,6 +763,15 @@ class APIStore:
         }
 
     def authenticate_token(self, raw_token: str) -> Optional[Dict[str, Any]]:
+        """
+        Validate a raw API token, reject expired or revoked credentials, and update last use.
+
+        Args:
+            raw_token (str): Input raw token used by the operation.
+
+        Returns:
+            Optional[Dict[str, Any]]: Token metadata when valid, otherwise None.
+        """
         match = re.fullmatch(r"lc_pat_([0-9a-f]{16})\.[A-Za-z0-9_-]+", raw_token)
         if not match:
             return None
@@ -620,6 +798,15 @@ class APIStore:
             return record
 
     def revoke_token(self, token_id: str) -> bool:
+        """
+        Revoke an API token and report whether it was active.
+
+        Args:
+            token_id (str): Input token id used by the operation.
+
+        Returns:
+            bool: True when an active token was revoked; otherwise False.
+        """
         with self.connection() as connection:
             cursor = connection.execute(
                 "UPDATE api_tokens SET revoked_at = ? WHERE token_id = ? AND revoked_at IS NULL",
@@ -628,6 +815,18 @@ class APIStore:
             return cursor.rowcount == 1
 
     def rate_limit(self, token_id: str, bucket: str, limit: int, window: int) -> Tuple[bool, int, int]:
+        """
+        Consume one API rate-limit slot and report remaining capacity.
+
+        Args:
+            token_id (str): Input token id used by the operation.
+            bucket (str): Input bucket used by the operation.
+            limit (int): Numeric limit, duration, or count controlling the operation.
+            window (int): Numeric limit, duration, or count controlling the operation.
+
+        Returns:
+            Tuple[bool, int, int]: Allowed flag, remaining requests, and seconds until reset.
+        """
         now = int(time.time())
         window_start = now - (now % window)
         with self.connection() as connection:
@@ -651,6 +850,16 @@ class APIStore:
 
     @staticmethod
     def _login_limit_keys(username: str, client_address: str) -> Dict[str, str]:
+        """
+        Build privacy-preserving rate-limit keys for a login attempt.
+
+        Args:
+            username (str): Input username used by the operation.
+            client_address (str): Input client address used by the operation.
+
+        Returns:
+            Dict[str, str]: Collection produced from the supplied input or stored state.
+        """
         normalized_username = username.casefold()
         return {
             "pair": hashlib.sha256(
@@ -667,6 +876,19 @@ class APIStore:
         account_limit: int,
         window: int,
     ) -> Tuple[bool, int]:
+        """
+        Check account and address login limits without modifying counters.
+
+        Args:
+            username (str): Input username used by the operation.
+            client_address (str): Input client address used by the operation.
+            pair_limit (int): Input pair limit used by the operation.
+            account_limit (int): Input account limit used by the operation.
+            window (int): Numeric limit, duration, or count controlling the operation.
+
+        Returns:
+            Tuple[bool, int]: Allowed flag and seconds until the current window resets.
+        """
         now = int(time.time())
         window_start = now - (now % window)
         retry_after = window_start + window - now
@@ -690,6 +912,17 @@ class APIStore:
     def record_login_failure(
         self, username: str, client_address: str, window: int
     ) -> None:
+        """
+        Record a failed login attempt for the account and client pair.
+
+        Args:
+            username (str): Input username used by the operation.
+            client_address (str): Input client address used by the operation.
+            window (int): Numeric limit, duration, or count controlling the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         now = int(time.time())
         window_start = now - (now % window)
         keys = self._login_limit_keys(username, client_address)
@@ -715,6 +948,16 @@ class APIStore:
                 )
 
     def clear_login_failures(self, username: str, client_address: str) -> None:
+        """
+        Clear failed-login counters after successful authentication.
+
+        Args:
+            username (str): Input username used by the operation.
+            client_address (str): Input client address used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         keys = self._login_limit_keys(username, client_address)
         with self.connection() as connection:
             connection.executemany(
@@ -723,6 +966,16 @@ class APIStore:
             )
 
     def find_idempotent(self, token_id: str, key: str) -> Optional[sqlite3.Row]:
+        """
+        Find an existing pipeline job for a token and idempotency key.
+
+        Args:
+            token_id (str): Input token id used by the operation.
+            key (str): Input key used by the operation.
+
+        Returns:
+            Optional[sqlite3.Row]: Existing job row when the key was used, otherwise None.
+        """
         with self.connection() as connection:
             return connection.execute(
                 "SELECT * FROM pipeline_jobs WHERE token_id=? AND idempotency_key=?",
@@ -739,6 +992,21 @@ class APIStore:
         idempotency_key: Optional[str] = None,
         payload_hash: Optional[str] = None,
     ) -> str:
+        """
+        Reserve a durable pipeline job record and its private output file.
+
+        Args:
+            job_id (str): Input job id used by the operation.
+            owner_id (str): Identifier of the user associated with the operation.
+            values (Dict[str, Any]): Input values to validate, transform, or persist.
+            command (List[str]): Input command used by the operation.
+            token_id (Optional[str]): Input token id used by the operation.
+            idempotency_key (Optional[str]): Input idempotency key used by the operation.
+            payload_hash (Optional[str]): Input payload hash used by the operation.
+
+        Returns:
+            str: Private output-log path reserved for the job.
+        """
         self._ensure_schema()
         output_path = str(Path(self.output_dir) / f"{job_id}.log")
         descriptor = os.open(
@@ -763,6 +1031,16 @@ class APIStore:
         return output_path
 
     def update_job(self, job_id: str, **fields: Any) -> None:
+        """
+        Update allowed status fields on a durable pipeline job.
+
+        Args:
+            job_id (str): Input job id used by the operation.
+            **fields (Any): Field or column metadata used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         allowed = {"status", "started_at", "completed_at", "return_code", "launcher_pid"}
         selected = {key: value for key, value in fields.items() if key in allowed}
         if not selected:
@@ -775,6 +1053,15 @@ class APIStore:
             )
 
     def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Load durable pipeline job metadata by ID.
+
+        Args:
+            job_id (str): Input job id used by the operation.
+
+        Returns:
+            Optional[Dict[str, Any]]: Job metadata dictionary, or None when the job does not exist.
+        """
         with self.connection() as connection:
             row = connection.execute(
                 "SELECT * FROM pipeline_jobs WHERE job_id=?", (job_id,)
@@ -782,6 +1069,12 @@ class APIStore:
         return dict(row) if row else None
 
     def mark_stale_jobs_interrupted(self) -> None:
+        """
+        Mark jobs whose launcher process is no longer alive as interrupted.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         with self.connection() as connection:
             rows = connection.execute(
                 "SELECT job_id, launcher_pid FROM pipeline_jobs WHERE status IN ('starting', 'running')"
@@ -807,17 +1100,43 @@ class StatisticsStore:
     METRICS = {"slides_completed", "accessions_logged"}
 
     def __init__(self, db_path: str, user_root: str):
+        """
+        Initialize the StatisticsStore instance.
+
+        Args:
+            db_path (str): Path to the DB.
+            user_root (str): Directory used as the user root.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.db_path = db_path
         self.user_root = user_root
         self._initialized_path: Optional[str] = None
         self._init_lock = threading.Lock()
 
     def configure(self, db_path: str, user_root: str) -> None:
+        """
+        Update statistics-store paths and invalidate cached schema initialization.
+
+        Args:
+            db_path (str): Path to the DB.
+            user_root (str): Directory used as the user root.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.db_path = db_path
         self.user_root = user_root
         self._initialized_path = None
 
     def _ensure_schema(self) -> None:
+        """
+        Create the statistics schema and secure the database path when needed.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         if self._initialized_path == self.db_path:
             return
         with self._init_lock:
@@ -856,6 +1175,12 @@ class StatisticsStore:
 
     @contextlib.contextmanager
     def connection(self):
+        """
+        Provide a transaction-managed statistics-store connection context.
+
+        Yields:
+            object: Context-managed API-store SQLite connection.
+        """
         self._ensure_schema()
         connection = sqlite3.connect(self.db_path, timeout=30)
         connection.row_factory = sqlite3.Row
@@ -867,11 +1192,27 @@ class StatisticsStore:
 
     @staticmethod
     def local_date() -> datetime.date:
+        """
+        Return the local calendar date used for activity statistics.
+
+        Returns:
+            datetime.date: Value produced by the operation.
+        """
         return datetime.date.today()
 
     def note_presence(
         self, user_id: str, activity_date: Optional[datetime.date] = None
     ) -> None:
+        """
+        Record that a user was present on a calendar date.
+
+        Args:
+            user_id (str): Identifier of the user associated with the operation.
+            activity_date (Optional[datetime.date]): Reference time or date used for the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         date_text = (activity_date or self.local_date()).isoformat()
         with self.connection() as connection:
             connection.execute(
@@ -886,6 +1227,21 @@ class StatisticsStore:
         amount: int = 1,
         activity_date: Optional[datetime.date] = None,
     ) -> None:
+        """
+        Increment one supported daily user-statistics metric.
+
+        Args:
+            user_id (str): Identifier of the user associated with the operation.
+            metric (str): Input metric used by the operation.
+            amount (int): Numeric limit, duration, or count controlling the operation.
+            activity_date (Optional[datetime.date]): Reference time or date used for the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            ValueError: If validation or the underlying resource operation fails.
+        """
         if metric not in self.METRICS:
             raise ValueError(f"Unknown statistics metric: {metric}")
         date_text = (activity_date or self.local_date()).isoformat()
@@ -905,6 +1261,16 @@ class StatisticsStore:
     def heartbeat(
         self, user_id: str, now: Optional[datetime.datetime] = None
     ) -> bool:
+        """
+        Credit at most one active minute per user per minute bucket.
+
+        Args:
+            user_id (str): Identifier of the user associated with the operation.
+            now (Optional[datetime.datetime]): Reference time or date used for the operation.
+
+        Returns:
+            bool: True when this call credited a new active minute; otherwise False.
+        """
         current = now or datetime.datetime.now()
         date_text = current.date().isoformat()
         minute_bucket = int(current.timestamp() // 60)
@@ -938,17 +1304,53 @@ class StatisticsStore:
 
     @staticmethod
     def rounded_hours(active_minutes: int) -> int:
+        """
+        Round active minutes to the nearest whole hour.
+
+        Args:
+            active_minutes (int): Input active minutes used by the operation.
+
+        Returns:
+            int: Nearest whole-hour value for the supplied active minutes.
+        """
         return (int(active_minutes) + 30) // 60
 
     @staticmethod
     def _storage_key(user_id: str) -> str:
+        """
+        Encode a user ID into a filesystem-safe statistics directory key.
+
+        Args:
+            user_id (str): Identifier of the user associated with the operation.
+
+        Returns:
+            str: String representation or formatted value produced by the operation.
+        """
         encoded = base64.urlsafe_b64encode(str(user_id).encode("utf-8"))
         return "u_" + encoded.decode("ascii").rstrip("=")
 
     def csv_path(self, user_id: str) -> Path:
+        """
+        Return the lifetime-statistics CSV path for a user.
+
+        Args:
+            user_id (str): Identifier of the user associated with the operation.
+
+        Returns:
+            Path: Path to the user's lifetime-statistics CSV.
+        """
         return Path(self.user_root) / self._storage_key(user_id) / "logs" / "lifetime_stats.csv"
 
     def _database_rows(self, user_id: str) -> Dict[str, Dict[str, int]]:
+        """
+        Load daily statistics rows for a user from SQLite.
+
+        Args:
+            user_id (str): Identifier of the user associated with the operation.
+
+        Returns:
+            Dict[str, Dict[str, int]]: Collection produced from the supplied input or stored state.
+        """
         with self.connection() as connection:
             rows = connection.execute(
                 """SELECT u.activity_date,
@@ -965,6 +1367,15 @@ class StatisticsStore:
         return values
 
     def read_csv(self, user_id: str) -> List[Dict[str, Any]]:
+        """
+        Read materialized lifetime-statistics rows for a user.
+
+        Args:
+            user_id (str): Identifier of the user associated with the operation.
+
+        Returns:
+            List[Dict[str, Any]]: List of materialized daily statistics dictionaries.
+        """
         path = self.csv_path(user_id)
         if not path.is_file():
             return []
@@ -982,6 +1393,16 @@ class StatisticsStore:
     def rollup_user(
         self, user_id: str, through_date: Optional[datetime.date] = None
     ) -> Path:
+        """
+        Materialize a user's database statistics through a cutoff date as CSV.
+
+        Args:
+            user_id (str): Identifier of the user associated with the operation.
+            through_date (Optional[datetime.date]): Reference time or date used for the operation.
+
+        Returns:
+            Path: Filesystem path produced by the operation.
+        """
         cutoff = through_date or (self.local_date() - datetime.timedelta(days=1))
         rows = self._database_rows(user_id)
         completed = []
@@ -1017,6 +1438,15 @@ class StatisticsStore:
         return path
 
     def dashboard(self, user_id: str) -> Dict[str, Any]:
+        """
+        Combine persisted and current-day statistics into dashboard data.
+
+        Args:
+            user_id (str): Identifier of the user associated with the operation.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing seven-day rows and lifetime totals.
+        """
         today = self.local_date()
         csv_rows = {row["date"]: row for row in self.read_csv(user_id)}
         database_rows = self._database_rows(user_id)
@@ -1055,6 +1485,18 @@ stats_store = StatisticsStore(Config.STATS_DB_PATH, Config.USER_STATS_ROOT)
 class User(UserMixin):
     """Represents a user account."""
     def __init__(self, id: str, password_hash: str, correction_count: int = 0, is_admin: bool = False):
+        """
+        Initialize the User instance.
+
+        Args:
+            id (str): Input id used by the operation.
+            password_hash (str): Input password hash used by the operation.
+            correction_count (int): Input correction count used by the operation.
+            is_admin (bool): Input is admin used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.id = id
         self.password_hash = password_hash
         # correction_count remains an accepted argument for legacy callers only.
@@ -1065,16 +1507,46 @@ class User(UserMixin):
             self.is_admin = bool(is_admin)
 
     def set_password(self, password: str) -> None:
+        """
+        Hash and store a user password.
+
+        Args:
+            password (str): Input password used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.password_hash = generate_password_hash(password)
 
     def verify_password(self, password: str) -> bool:
+        """
+        Verify a password against the stored password hash.
+
+        Args:
+            password (str): Input password used by the operation.
+
+        Returns:
+            bool: Whether the requested condition or validation succeeds.
+        """
         return check_password_hash(self.password_hash, password)
 
     @property
     def slides_completed(self) -> int:
+        """
+        Return the number of slides completed by the user.
+
+        Returns:
+            int: Integer count of slides completed by the user.
+        """
         return int(stats_store.dashboard(str(self.id))["totals"]["slides_completed"])
 
     def to_dict(self) -> Dict[str, str]:
+        """
+        Serialize the user to the persistence dictionary expected by its store.
+
+        Returns:
+            Dict[str, str]: Collection produced from the supplied input or stored state.
+        """
         return {
             "id": self.id,
             "password_hash": self.password_hash,
@@ -1082,6 +1554,12 @@ class User(UserMixin):
         }
 
     def __repr__(self) -> str:
+        """
+        Return a concise developer-facing representation of the User.
+
+        Returns:
+            str: String representation or formatted value produced by the operation.
+        """
         return f"<User {self.id}>"
 
 
@@ -1091,6 +1569,21 @@ class QueueItem:
                  leased_by_id: Optional[str] = None, leased_at: Optional[Union[str, datetime.datetime]] = None,
                  completed_by_id: Optional[str] = None, completed_at: Optional[Union[str, datetime.datetime]] = None,
                  row_id: Optional[int] = None):
+        """
+        Initialize the QueueItem instance.
+
+        Args:
+            original_index (int): Input original index used by the operation.
+            status (str): Input status used by the operation.
+            leased_by_id (Optional[str]): Input leased by id used by the operation.
+            leased_at (Optional[Union[str, datetime.datetime]]): Reference time or date used for the operation.
+            completed_by_id (Optional[str]): Input completed by id used by the operation.
+            completed_at (Optional[Union[str, datetime.datetime]]): Reference time or date used for the operation.
+            row_id (Optional[int]): Input row id used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.id = row_id # ID is strictly internal/optional for QueueItem in this CSV context, but we keep track if needed.
         self.original_index = int(original_index)
         self.status = status
@@ -1102,6 +1595,15 @@ class QueueItem:
         self.completed_at = self._parse_date(completed_at)
 
     def _parse_date(self, date_val: Union[str, datetime.datetime, None]) -> Optional[datetime.datetime]:
+        """
+        Parse a queue timestamp into a datetime when it is valid.
+
+        Args:
+            date_val (Union[str, datetime.datetime, None]): Input date val used by the operation.
+
+        Returns:
+            Optional[datetime.datetime]: Transformed representation of the supplied input.
+        """
         if not date_val:
             return None
         if isinstance(date_val, datetime.datetime):
@@ -1112,9 +1614,24 @@ class QueueItem:
             return None
 
     def _format_date(self, date_val: Optional[datetime.datetime]) -> str:
+        """
+        Format an optional queue datetime for CSV persistence.
+
+        Args:
+            date_val (Optional[datetime.datetime]): Input date val used by the operation.
+
+        Returns:
+            str: String representation or formatted value produced by the operation.
+        """
         return date_val.isoformat() if date_val else ""
 
     def to_dict(self) -> Dict[str, str]:
+        """
+        Serialize the queue item to its persistence dictionary.
+
+        Returns:
+            Dict[str, str]: Collection produced from the supplied input or stored state.
+        """
         return {
             "original_index": str(self.original_index),
             "status": self.status,
@@ -1126,24 +1643,51 @@ class QueueItem:
 
     @property
     def leased_by(self):
-        """Helper to resolve user object for template compatibility."""
+        """
+        Helper to resolve user object for template compatibility.
+
+        Returns:
+            object: User object for the current lease, or None when unleased.
+        """
         if self.leased_by_id:
             # Access global user_manager
             return user_manager.get(self.leased_by_id)
         return None
 
     def __repr__(self) -> str:
+        """
+        Return a concise developer-facing representation of the QueueItem.
+
+        Returns:
+            str: String representation or formatted value produced by the operation.
+        """
         return f"<QueueItem {self.original_index} - {self.status}>"
 
 
 class CSVManager:
     """Generic CSV persistence manager."""
     def __init__(self, filepath: str, fieldnames: List[str]):
+        """
+        Initialize the CSVManager instance.
+
+        Args:
+            filepath (str): Path to the input file or directory.
+            fieldnames (List[str]): Input fieldnames used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.filepath = filepath
         self.fieldnames = fieldnames
         self._lock = threading.Lock()
 
     def _ensure_file(self):
+        """
+        Create the managed CSV file with its header when it does not exist.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         if not os.path.exists(self.filepath):
             descriptor = os.open(
                 self.filepath, os.O_WRONLY | os.O_CREAT | os.O_EXCL, PRIVATE_FILE_MODE
@@ -1153,6 +1697,12 @@ class CSVManager:
                 writer.writeheader()
 
     def read_all(self) -> List[Dict[str, str]]:
+        """
+        Read all records from the managed CSV file.
+
+        Returns:
+            List[Dict[str, str]]: Collection produced from the supplied input or stored state.
+        """
         self._ensure_file()
         with self._lock:
             try:
@@ -1164,6 +1714,18 @@ class CSVManager:
                 return []
 
     def write_all(self, data: List[Dict[str, str]]) -> None:
+        """
+        Atomically write all records to the managed CSV file.
+
+        Args:
+            data (List[Dict[str, str]]): Input data to validate, transform, or persist.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            DataSaveError: If validation or the underlying resource operation fails.
+        """
         with self._lock:
             try:
                 # write atomic
@@ -1184,12 +1746,24 @@ class CSVManager:
 
 class UserManager(CSVManager):
     def __init__(self):
+        """
+        Initialize the user manager and load persisted accounts.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         super().__init__(Config.USERS_CSV_PATH, ["id", "password_hash", "is_admin"])
         # Cache users in memory for performance, similar to DB
         self.users: Dict[str, User] = {}
         self.load()
 
     def load(self):
+        """
+        Load persisted user accounts into the in-memory cache.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         rows = self.read_all()
         self.users = {}
         for row in rows:
@@ -1201,21 +1775,60 @@ class UserManager(CSVManager):
             self.users[u.id] = u
 
     def save(self):
+        """
+        Persist all cached user accounts to CSV.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         data = [u.to_dict() for u in self.users.values()]
         self.write_all(data)
 
     def get(self, user_id: str) -> Optional[User]:
+        """
+        Return one managed user by identifier.
+
+        Args:
+            user_id (str): Identifier of the user associated with the operation.
+
+        Returns:
+            Optional[User]: Value produced by the operation.
+        """
         return self.users.get(user_id)
 
     def add(self, user: User):
+        """
+        Add one user to the cache and persist the change.
+
+        Args:
+            user (User): Input user used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.users[user.id] = user
         self.save()  # Auto-save on add due to simple architecture
 
     def update(self, user: User):
+        """
+        Replace one cached user and persist the change.
+
+        Args:
+            user (User): Input user used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.users[user.id] = user
         self.save()
     
     def get_all(self) -> List[User]:
+        """
+        Return all cached user accounts.
+
+        Returns:
+            List[User]: Collection produced from the supplied input or stored state.
+        """
         return list(self.users.values())
 
 
@@ -1223,11 +1836,26 @@ class QueueManager:
     """In-memory queue adapter persisted in the central batch catalog."""
 
     def __init__(self, batch_id: str):
+        """
+        Initialize a batch queue manager with an empty in-memory snapshot.
+
+        Args:
+            batch_id (str): Identifier of the batch to operate on.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.batch_id = batch_id
         self.items: Dict[int, QueueItem] = {}
         self._snapshot: Dict[int, Dict[str, str]] = {}
 
     def load(self):
+        """
+        Load a batch queue from the central catalog.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         rows = batch_catalog.load_queue(Config.INSTANCE_DIR, self.batch_id)
         self.items = {}
         for row in rows:
@@ -1247,6 +1875,12 @@ class QueueManager:
         self._snapshot = {index: item.to_dict() for index, item in self.items.items()}
 
     def save(self):
+        """
+        Persist changed queue rows while preserving unrelated leases.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         current = {index: item.to_dict() for index, item in self.items.items()}
         changed = [row for index, row in current.items() if self._snapshot.get(index) != row]
         deleted = set(self._snapshot).difference(current)
@@ -1259,21 +1893,60 @@ class QueueManager:
         self._snapshot = current
 
     def get(self, original_index: int) -> Optional[QueueItem]:
+        """
+        Return one queue item by original row index.
+
+        Args:
+            original_index (int): Input original index used by the operation.
+
+        Returns:
+            Optional[QueueItem]: Value produced by the operation.
+        """
         return self.items.get(original_index)
     
     def add(self, item: QueueItem):
+        """
+        Add a queue item to the in-memory batch queue.
+
+        Args:
+            item (QueueItem): Input item used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.items[item.original_index] = item
         # Batch add usually calls save manually, but for single integrity:
         # self.save() 
     
     def get_all(self) -> List[QueueItem]:
+        """
+        Return all queue items in the batch.
+
+        Returns:
+            List[QueueItem]: Collection produced from the supplied input or stored state.
+        """
         return list(self.items.values())
 
     def update(self):
-        """Persist current state."""
+        """
+        Persist current state.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.save()
 
     def claim(self, user_id: str, original_index: Optional[int] = None) -> Optional[QueueItem]:
+        """
+        Atomically claim one available queue item for a user.
+
+        Args:
+            user_id (str): Identifier of the user associated with the operation.
+            original_index (Optional[int]): Input original index used by the operation.
+
+        Returns:
+            Optional[QueueItem]: Claimed queue item, or None when no item is available.
+        """
         row = batch_catalog.claim_item(
             Config.INSTANCE_DIR,
             self.batch_id,
@@ -1285,6 +1958,15 @@ class QueueManager:
         return self.items.get(int(row["original_index"])) if row else None
 
     def release_expired(self, before: datetime.datetime) -> int:
+        """
+        Release queue items whose leases have expired.
+
+        Args:
+            before (datetime.datetime): Reference time or date used for the operation.
+
+        Returns:
+            int: Number of leases released.
+        """
         count = batch_catalog.release_expired(
             Config.INSTANCE_DIR, self.batch_id, before.isoformat()
         )
@@ -1293,6 +1975,15 @@ class QueueManager:
         return count
 
     def release_user(self, user_id: str) -> int:
+        """
+        Release all queue items leased by a user.
+
+        Args:
+            user_id (str): Identifier of the user associated with the operation.
+
+        Returns:
+            int: Number of leases released for the user.
+        """
         count = batch_catalog.release_user(Config.INSTANCE_DIR, self.batch_id, user_id)
         self.load()
         return count
@@ -1304,6 +1995,15 @@ user_manager = UserManager()
 
 @login_manager.user_loader
 def load_user(user_id: str) -> Optional[User]:
+    """
+    Load a user account by identifier for Flask-Login.
+
+    Args:
+        user_id (str): Identifier of the user associated with the operation.
+
+    Returns:
+        Optional[User]: Value produced by the operation.
+    """
     return user_manager.get(user_id)
 
 
@@ -1313,6 +2013,16 @@ def load_user(user_id: str) -> Optional[User]:
 class DataManager:
     """Manages the in-memory CSV data state, loading, and saving."""
     def __init__(self, batch_root: Optional[Path] = None, csv_path: Optional[Path] = None):
+        """
+        Initialize the in-memory CSV data manager for an optional batch.
+
+        Args:
+            batch_root (Optional[Path]): Directory used as the batch root.
+            csv_path (Optional[Path]): Path to the CSV.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.data: List[Dict[str, Any]] = []
         self.headers: List[str] = []
         self.batch_root = batch_root
@@ -1321,7 +2031,18 @@ class DataManager:
         self.critical_headers = ["AccessionID", "Stain", "ParsingQCPassed", "original_slide_path"]
 
     def load_data(self, file_path: Optional[Union[str, Path]] = None) -> None:
-        """Loads CSV data into memory safely."""
+        """
+        Loads CSV data into memory safely.
+
+        Args:
+            file_path (Optional[Union[str, Path]]): Path to the input file or directory.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            DataLoadError: If validation or the underlying resource operation fails.
+        """
         file_path = str(file_path or self.csv_path or Config.CSV_FILE_PATH)
         with self._lock:
             app.logger.info(f"Loading CSV data from: {file_path}")
@@ -1386,7 +2107,18 @@ class DataManager:
                 raise DataLoadError(f"Error reading CSV: {e}")
 
     def save_data(self, target_path: Optional[Union[str, Path]] = None) -> None:
-        """Saves current data to CSV atomically."""
+        """
+        Saves current data to CSV atomically.
+
+        Args:
+            target_path (Optional[Union[str, Path]]): Path to the target.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            DataSaveError: If validation or the underlying resource operation fails.
+        """
         target_path = str(target_path or self.csv_path or Config.CSV_FILE_PATH)
         with self._lock:
             if not self.data or not self.headers:
@@ -1430,7 +2162,12 @@ class DataManager:
                 raise DataSaveError(f"Failed to save CSV: {e}")
 
     def _recalculate_accession_counts(self) -> None:
-        """Internal helper to count AccessionID occurrences."""
+        """
+        Internal helper to count AccessionID occurrences.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         if not self.data:
             return
         id_counts = Counter(
@@ -1443,13 +2180,31 @@ class DataManager:
             row["_accession_id_count"] = id_counts[current_id] if current_id else 0
     
     def get_row(self, index: int) -> Optional[Dict[str, Any]]:
+        """
+        Return one loaded data row by its original index.
+
+        Args:
+            index (int): Input index used by the operation.
+
+        Returns:
+            Optional[Dict[str, Any]]: Row dictionary, or None when the index is not loaded.
+        """
         with self._lock:
             if 0 <= index < len(self.data):
                 return self.data[index]
             return None
 
     def update_row(self, index: int, updates: Dict[str, Any]) -> bool:
-        """Updates a row and triggers recalculations if needed."""
+        """
+        Updates a row and triggers recalculations if needed.
+
+        Args:
+            index (int): Input index used by the operation.
+            updates (Dict[str, Any]): Input updates used by the operation.
+
+        Returns:
+            bool: Whether the requested condition or validation succeeds.
+        """
         with self._lock:
             if not (0 <= index < len(self.data)):
                 return False
@@ -1471,12 +2226,26 @@ class DataManager:
             return has_changed
 
     def clear(self):
+        """
+        Clear the manager's in-memory data and headers.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         with self._lock:
             self.data = []
             self.headers = []
 
     def get_absolute_path(self, relative_path: str) -> Optional[str]:
-        """Resolve a CSV image path, constrained to the active batch directory."""
+        """
+        Resolve a CSV image path, constrained to the active batch directory.
+
+        Args:
+            relative_path (str): Path to the relative.
+
+        Returns:
+            Optional[str]: Value produced by the operation.
+        """
         if not relative_path:
             return None
 
@@ -1494,7 +2263,12 @@ class DataManager:
         return str(resolved)
 
     def check_paths(self) -> List[str]:
-        """Checks if all image paths in the loaded data exist and are readable."""
+        """
+        Checks if all image paths in the loaded data exist and are readable.
+
+        Returns:
+            List[str]: Collection produced from the supplied input or stored state.
+        """
         missing_or_unreadable = []
         with self._lock:
             for i, row in enumerate(self.data):
@@ -1513,6 +2287,17 @@ class BatchContext:
     """Loaded data and persistent queue belonging to one discovered batch."""
 
     def __init__(self, batch_id: str, root: Path, catalog_row: Optional[Dict[str, Any]] = None):
+        """
+        Initialize a batch context, data manager, and queue manager.
+
+        Args:
+            batch_id (str): Identifier of the batch to operate on.
+            root (Path): Directory used as the root.
+            catalog_row (Optional[Dict[str, Any]]): Input catalog row used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.id = batch_id
         self.root = root
         self.name = root.name
@@ -1530,7 +2315,18 @@ class BatchContext:
         self._total_count = int(row.get("queue_total", row.get("slide_count", 0)))
 
     def load_completed_stages(self, create_if_missing: bool = False) -> None:
-        """Refresh stage flags from the central catalog."""
+        """
+        Refresh stage flags from the central catalog.
+
+        Args:
+            create_if_missing (bool): Input create if missing used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            DataLoadError: If validation or the underlying resource operation fails.
+        """
         row = batch_catalog.get_batch(Config.INSTANCE_DIR, self.id)
         if row is None:
             raise DataLoadError("batch is missing from batch_catalog.sqlite3")
@@ -1540,7 +2336,15 @@ class BatchContext:
         }
 
     def mark_qc_complete(self) -> None:
-        """Atomically mark the catalog QC stage complete."""
+        """
+        Atomically mark the catalog QC stage complete.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            DataSaveError: If validation or the underlying resource operation fails.
+        """
         try:
             if not batch_catalog.mark_qc_complete_if_queue_complete(
                 Config.INSTANCE_DIR, self.id
@@ -1553,7 +2357,15 @@ class BatchContext:
             raise DataSaveError(f"could not update batch catalog: {exc}") from exc
 
     def mark_renamed_complete(self) -> None:
-        """Atomically mark both catalog workflow stages complete."""
+        """
+        Atomically mark both catalog workflow stages complete.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            DataSaveError: If validation or the underlying resource operation fails.
+        """
         try:
             batch_catalog.update_stages(
                 Config.INSTANCE_DIR, self.id, qc_complete=True, renamed_complete=True
@@ -1564,9 +2376,21 @@ class BatchContext:
 
     @property
     def qc_complete(self) -> bool:
+        """
+        Return whether the batch quality-control stage is complete.
+
+        Returns:
+            bool: True when QC is complete; otherwise False.
+        """
         return self.completed_stages["QC"]
 
     def refresh(self) -> None:
+        """
+        Refresh batch stage flags and counts from the central catalog.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         mod_time = self.csv_path.stat().st_mtime
         if not self.data_manager.data or mod_time != self.csv_mod_time:
             self.data_manager.load_data(self.csv_path)
@@ -1605,15 +2429,33 @@ class BatchContext:
 
     @property
     def is_complete(self) -> bool:
+        """
+        Return whether all workflow stages for the batch are complete.
+
+        Returns:
+            bool: True when every required workflow stage is complete; otherwise False.
+        """
         items = self.queue_manager.get_all()
         return bool(items) and all(item.status == "completed" for item in items)
 
     @property
     def pending_count(self) -> int:
+        """
+        Return the number of pending queue items in the batch.
+
+        Returns:
+            int: Number of pending queue rows.
+        """
         return self._pending_count
 
     @property
     def total_count(self) -> int:
+        """
+        Return the total number of queue items in the batch.
+
+        Returns:
+            int: Total queue-row count.
+        """
         return self._total_count
 
 
@@ -1631,10 +2473,29 @@ _longitudinal_lock = threading.Lock()
 
 
 def _batch_relative_path(root: Path) -> str:
+    """
+    Return the normalized path used to identify a batch.
+
+    Args:
+        root (Path): Directory used as the root.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     return normalize_relative_path(root.relative_to(Path(Config.LABEL_CHECK_BATCHES)).as_posix())
 
 
 def _reconcile_queue_rows(public_id: str, slide_rows: Sequence[Dict[str, str]]) -> None:
+    """
+    Reconcile queue records with the current slide rows for a batch.
+
+    Args:
+        public_id (str): Identifier of the batch to operate on.
+        slide_rows (Sequence[Dict[str, str]]): Input slide rows used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     current = {
         int(row["original_index"]): row
         for row in batch_catalog.load_queue(Config.INSTANCE_DIR, public_id)
@@ -1658,7 +2519,15 @@ def _reconcile_queue_rows(public_id: str, slide_rows: Sequence[Dict[str, str]]) 
 
 
 def reconcile_batch_catalog() -> List[str]:
-    """Refresh catalog from batch directory; never read legacy stage/queue files."""
+    """
+    Refresh catalog from batch directory; never read legacy stage/queue files.
+
+    Returns:
+        List[str]: Collection produced from the supplied input or stored state.
+
+    Raises:
+        DataLoadError: If validation or the underlying resource operation fails.
+    """
     base = Path(Config.LABEL_CHECK_BATCHES)
     warnings: List[str] = []
     seen: List[str] = []
@@ -1778,6 +2647,12 @@ def reconcile_batch_catalog() -> List[str]:
 
 
 def _catalog_reconciler() -> None:
+    """
+    Run the background loop that refreshes the batch catalog.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     while True:
         time.sleep(max(1, Config.BATCH_CATALOG_RECONCILE_SECONDS))
         try:
@@ -1797,6 +2672,12 @@ def _catalog_reconciler() -> None:
 
 
 def _ensure_catalog_reconciled() -> List[str]:
+    """
+    Ensure the central batch catalog is current for the configured roots.
+
+    Returns:
+        List[str]: Collection produced from the supplied input or stored state.
+    """
     global _catalog_reconciled_target, _catalog_reconciler_started
     target = (str(Path(Config.INSTANCE_DIR)), str(Path(Config.LABEL_CHECK_BATCHES)))
     warnings: List[str] = []
@@ -1821,7 +2702,12 @@ def _ensure_catalog_reconciled() -> List[str]:
 
 
 def discover_batches() -> Tuple[List[BatchContext], List[str]]:
-    """Return lightweight valid batch contexts from central catalog."""
+    """
+    Return lightweight valid batch contexts from central catalog.
+
+    Returns:
+        Tuple[List[BatchContext], List[str]]: Collection produced from the supplied input or stored state.
+    """
     warnings = _ensure_catalog_reconciled()
     if not warnings:
         raw_warnings = batch_catalog.get_metadata(
@@ -1856,6 +2742,15 @@ def discover_batches() -> Tuple[List[BatchContext], List[str]]:
 
 
 def _selected_batch(allow_completed: bool = False) -> Tuple[Optional[BatchContext], List[BatchContext], List[str]]:
+    """
+    Resolve the batch selected for the current QC request.
+
+    Args:
+        allow_completed (bool): Boolean option controlling whether the operation is forced or broadened.
+
+    Returns:
+        Tuple[Optional[BatchContext], List[BatchContext], List[str]]: Selected batch, available batches, and reconciliation warnings.
+    """
     batches, warnings = discover_batches()
     available = [batch for batch in batches if not batch.qc_complete]
     if request.args.get("choose") == "1":
@@ -1873,6 +2768,12 @@ def _selected_batch(allow_completed: bool = False) -> Tuple[Optional[BatchContex
 
 
 def _renaming_batches() -> Tuple[List[BatchContext], List[str]]:
+    """
+    Return batches eligible for post-QC renaming.
+
+    Returns:
+        Tuple[List[BatchContext], List[str]]: Eligible batch contexts and reconciliation warnings.
+    """
     batches, warnings = discover_batches()
     return [
         batch for batch in batches
@@ -1881,6 +2782,15 @@ def _renaming_batches() -> Tuple[List[BatchContext], List[str]]:
 
 
 def _renaming_context(batch_id: str) -> Optional[BatchContext]:
+    """
+    Resolve an eligible renaming batch context by public ID.
+
+    Args:
+        batch_id (str): Identifier of the batch to operate on.
+
+    Returns:
+        Optional[BatchContext]: Eligible batch context, or None when unavailable.
+    """
     batches, _ = discover_batches()
     return next(
         (
@@ -1894,11 +2804,30 @@ def _renaming_context(batch_id: str) -> Optional[BatchContext]:
 
 
 def _renaming_job_state(batch_id: str) -> Dict[str, Any]:
+    """
+    Return a snapshot of a batch renaming-job state.
+
+    Args:
+        batch_id (str): Identifier of the batch to operate on.
+
+    Returns:
+        Dict[str, Any]: Copy of the current renaming-job state dictionary.
+    """
     with _renaming_jobs_lock:
         return dict(_renaming_jobs.get(batch_id, {"status": "idle", "error": ""}))
 
 
 def _start_longitudinal_job(context: BatchContext, *, force: bool = False) -> bool:
+    """
+    Start background longitudinal CoPath history preparation for a batch.
+
+    Args:
+        context (BatchContext): Input context used by the operation.
+        force (bool): Boolean option controlling whether the operation is forced or broadened.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+    """
     try:
         job = renaming.read_history_job(context.root)
     except renaming.RenamingError:
@@ -1913,6 +2842,12 @@ def _start_longitudinal_job(context: BatchContext, *, force: bool = False) -> bo
         _longitudinal_active.add(context.id)
 
     def worker() -> None:
+        """
+        Run the background longitudinal-history job and clear its active marker.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         try:
             with _renaming_clone_lock:
                 renaming.stage_longitudinal_history(
@@ -1937,6 +2872,15 @@ def _start_longitudinal_job(context: BatchContext, *, force: bool = False) -> bo
 
 
 def _resume_longitudinal_jobs(batches: Sequence[BatchContext]) -> None:
+    """
+    Resume eligible longitudinal jobs for discovered batches.
+
+    Args:
+        batches (Sequence[BatchContext]): Input batches used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     for context in batches:
         _start_longitudinal_job(context)
 
@@ -1948,7 +2892,18 @@ def _start_renaming_job(
     new_accession: Optional[str] = None,
     force: bool = False,
 ) -> bool:
-    """Start one background preparation or accession retry for a batch."""
+    """
+    Start one background preparation or accession retry for a batch.
+
+    Args:
+        context (BatchContext): Input context used by the operation.
+        old_accession (Optional[str]): Input old accession used by the operation.
+        new_accession (Optional[str]): Input new accession used by the operation.
+        force (bool): Boolean option controlling whether the operation is forced or broadened.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+    """
     with _renaming_jobs_lock:
         existing = _renaming_jobs.get(context.id, {})
         if existing.get("status") in {"preparing", "retrying"}:
@@ -1966,6 +2921,12 @@ def _start_renaming_job(
         }
 
     def worker() -> None:
+        """
+        Run the background renaming job and publish its final state.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         try:
             with _renaming_clone_lock:
                 if old_accession is not None and new_accession is not None:
@@ -2001,7 +2962,15 @@ def _start_renaming_job(
 # 8. HELPER FUNCTIONS
 # ==============================================================================
 def _release_expired_leases(context: BatchContext):
-    """Scans for and releases any item leases that have expired."""
+    """
+    Scans for and releases any item leases that have expired.
+
+    Args:
+        context (BatchContext): Input context used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     queue_manager = context.queue_manager
     lease_duration = datetime.timedelta(seconds=app.config["LEASE_DURATION_SECONDS"])
     expired_time = datetime.datetime.utcnow() - lease_duration
@@ -2015,7 +2984,19 @@ def _release_expired_leases(context: BatchContext):
 
 
 def _create_backup(context: BatchContext, suffix: str = "") -> None:
-    """Creates a timestamped backup of the current CSV file."""
+    """
+    Creates a timestamped backup of the current CSV file.
+
+    Args:
+        context (BatchContext): Input context used by the operation.
+        suffix (str): Input suffix used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        BackupError: If validation or the underlying resource operation fails.
+    """
     source_path = str(context.csv_path)
     if not os.path.exists(source_path):
         return
@@ -2032,6 +3013,15 @@ def _create_backup(context: BatchContext, suffix: str = "") -> None:
 
 
 def _is_row_incomplete(row_dict: Dict[str, Any]) -> bool:
+    """
+    Return whether a data row still requires review.
+
+    Args:
+        row_dict (Dict[str, Any]): Input row dict used by the operation.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+    """
     return not row_dict.get("_is_complete", False)
 
 
@@ -2039,7 +3029,15 @@ _qc_filename_component_pattern = re.compile(r"^[A-Z0-9-]+$")
 
 
 def _normalize_qc_values(values: Dict[str, Any]) -> Dict[str, Any]:
-    """Return QC values in their canonical form without hiding invalid input."""
+    """
+    Return QC values in their canonical form without hiding invalid input.
+
+    Args:
+        values (Dict[str, Any]): Input values to validate, transform, or persist.
+
+    Returns:
+        Dict[str, Any]: Collection produced from the supplied input or stored state.
+    """
     normalized = dict(values)
     normalized["AccessionID"] = str(values.get("AccessionID") or "").strip()
     for field in ("Stain", "BlockNumber"):
@@ -2051,7 +3049,15 @@ def _normalize_qc_values(values: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _qc_row_validation_errors(row: Dict[str, Any]) -> List[str]:
-    """Return the QC fields that are missing or invalid for a completed row."""
+    """
+    Return the QC fields that are missing or invalid for a completed row.
+
+    Args:
+        row (Dict[str, Any]): One data row to process.
+
+    Returns:
+        List[str]: Collection produced from the supplied input or stored state.
+    """
     errors = []
     accession_id = str(row.get("AccessionID") or "")
     if not accession_id.strip():
@@ -2069,7 +3075,15 @@ def _qc_row_validation_errors(row: Dict[str, Any]) -> List[str]:
 
 
 def _requeue_invalid_qc_rows(context: BatchContext) -> List[int]:
-    """Return invalid completed rows to the pending queue."""
+    """
+    Return invalid completed rows to the pending queue.
+
+    Args:
+        context (BatchContext): Input context used by the operation.
+
+    Returns:
+        List[int]: Collection produced from the supplied input or stored state.
+    """
     invalid_indices = []
     for row in context.data_manager.data:
         if not _qc_row_validation_errors(row):
@@ -2095,6 +3109,12 @@ def _requeue_invalid_qc_rows(context: BatchContext) -> List[int]:
 
 
 def flash_messages() -> List[Dict[str, str]]:
+    """
+    Return flashed messages in the structure expected by the templates.
+
+    Returns:
+        List[Dict[str, str]]: Collection produced from the supplied input or stored state.
+    """
     return [
         {"category": category, "message": message}
         for category, message in get_flashed_messages(with_categories=True)
@@ -2154,7 +3174,15 @@ _time_pattern = re.compile(r"^[0-9]{2}:[0-9]{2}$")
 
 
 def _save_sdl_workbook(workbook) -> None:
-    """Atomically replaces the SDL workbook with the supplied workbook."""
+    """
+    Atomically replaces the SDL workbook with the supplied workbook.
+
+    Args:
+        workbook (object): Input workbook used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     workbook_path = Config.SDL_FILE_PATH
     workbook_dir = os.path.dirname(workbook_path)
     file_mode = stat.S_IMODE(os.stat(workbook_path).st_mode)
@@ -2172,7 +3200,18 @@ def _save_sdl_workbook(workbook) -> None:
 
 
 def _sdl_header_columns(worksheet: Worksheet) -> Dict[str, int]:
-    """Map managed SDL headers to their worksheet columns."""
+    """
+    Map managed SDL headers to their worksheet columns.
+
+    Args:
+        worksheet (Worksheet): Input worksheet used by the operation.
+
+    Returns:
+        Dict[str, int]: Mapping from required SDL headers to worksheet columns.
+
+    Raises:
+        SDLWorkbookError: If validation or the underlying resource operation fails.
+    """
     header_locations: Dict[str, List[int]] = defaultdict(list)
     for column in range(1, worksheet.max_column + 1):
         value = worksheet.cell(row=1, column=column).value
@@ -2197,7 +3236,15 @@ def _sdl_header_columns(worksheet: Worksheet) -> Dict[str, int]:
 
 
 def _load_sdl_workbook():
-    """Loads and validates the configured SDL workbook and worksheet."""
+    """
+    Loads and validates the configured SDL workbook and worksheet.
+
+    Returns:
+        tuple: Collection produced from the supplied input or stored state.
+
+    Raises:
+        SDLWorkbookError: If validation or the underlying resource operation fails.
+    """
     workbook_path = Config.SDL_FILE_PATH
     if not os.path.isfile(workbook_path):
         raise SDLWorkbookError(
@@ -2235,6 +3282,15 @@ def _load_sdl_workbook():
 
 
 def _coerce_sdl_bool(value: Any) -> bool:
+    """
+    Convert a stored SDL status value to a boolean.
+
+    Args:
+        value (Any): Input value to validate, transform, or persist.
+
+    Returns:
+        bool: Boolean representation of the SDL status value.
+    """
     if isinstance(value, bool):
         return value
     if isinstance(value, (int, float)):
@@ -2245,6 +3301,16 @@ def _coerce_sdl_bool(value: Any) -> bool:
 
 
 def _format_sdl_value(header: str, value: Any) -> str:
+    """
+    Format the SDL value.
+
+    Args:
+        header (str): Field or column metadata used by the operation.
+        value (Any): Input value to validate, transform, or persist.
+
+    Returns:
+        str: Display-ready SDL cell text.
+    """
     if value is None:
         return ""
     if header.startswith("Date ") and isinstance(value, (datetime.datetime, datetime.date)):
@@ -2255,6 +3321,16 @@ def _format_sdl_value(header: str, value: Any) -> str:
 
 
 def _sdl_row_signature(worksheet: Worksheet, row_number: int) -> str:
+    """
+    Calculate a stable signature for an SDL worksheet row.
+
+    Args:
+        worksheet (Worksheet): Input worksheet used by the operation.
+        row_number (int): Input row number used by the operation.
+
+    Returns:
+        str: Stable signature for the worksheet row.
+    """
     header_columns = _sdl_header_columns(worksheet)
     values = tuple(
         worksheet.cell(row=row_number, column=header_columns[header]).value
@@ -2264,6 +3340,15 @@ def _sdl_row_signature(worksheet: Worksheet, row_number: int) -> str:
 
 
 def _read_sdl_rows(worksheet: Worksheet) -> List[Dict[str, Any]]:
+    """
+    Read the SDL rows.
+
+    Args:
+        worksheet (Worksheet): Input worksheet used by the operation.
+
+    Returns:
+        List[Dict[str, Any]]: SDL worksheet rows as dictionaries.
+    """
     header_columns = _sdl_header_columns(worksheet)
     rows = []
     for row_number in range(2, worksheet.max_row + 1):
@@ -2296,11 +3381,28 @@ TABLE_QUERY_MAX_LENGTH = 200
 
 
 def _clean_table_query(value: Optional[str]) -> str:
+    """
+    Normalize a table-search query for filtering.
+
+    Args:
+        value (Optional[str]): Input value to validate, transform, or persist.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     return (value or "").strip()[:TABLE_QUERY_MAX_LENGTH]
 
 
 def _natural_sort_key(value: str) -> Tuple[Tuple[int, Any], ...]:
-    """Build a case-insensitive key that orders embedded numbers numerically."""
+    """
+    Build a case-insensitive key that orders embedded numbers numerically.
+
+    Args:
+        value (str): Input value to validate, transform, or persist.
+
+    Returns:
+        Tuple[Tuple[int, Any], ...]: Collection produced from the supplied input or stored state.
+    """
     return tuple(
         (0, int(part)) if part.isdigit() else (1, part)
         for part in re.split(r"(\d+)", value.strip().casefold())
@@ -2316,7 +3418,20 @@ def _filter_sort_records(
     sort_column: Optional[int] = None,
     sort_direction: str = "asc",
 ) -> List[Any]:
-    """Filter displayed row values, then apply a stable natural sort."""
+    """
+    Filter displayed row values, then apply a stable natural sort.
+
+    Args:
+        records (List[Any]): Data rows to process.
+        values_for_record (object): Input values for record used by the operation.
+        global_query (str): Input global query used by the operation.
+        column_filters (Optional[Dict[int, str]]): Input column filters used by the operation.
+        sort_column (Optional[int]): Navigation or sorting option controlling the result order.
+        sort_direction (str): Navigation or sorting option controlling the result order.
+
+    Returns:
+        List[Any]: Filtered and naturally sorted records.
+    """
     global_term = _clean_table_query(global_query).casefold()
     filters = {
         column: cleaned.casefold()
@@ -2357,6 +3472,15 @@ def _filter_sort_records(
 def _request_table_state(
     column_count: int,
 ) -> Tuple[str, Dict[int, str], Optional[int], str]:
+    """
+    Read table filtering and sorting state from the current request.
+
+    Args:
+        column_count (int): Field or column metadata used by the operation.
+
+    Returns:
+        Tuple[str, Dict[int, str], Optional[int], str]: Global query, column filters, sort column, and sort direction.
+    """
     global_query = _clean_table_query(request.args.get("q"))
     column_filters = {
         column: value
@@ -2381,6 +3505,18 @@ def _table_query_params(
     sort_column: Optional[int],
     sort_direction: str,
 ) -> Dict[str, str]:
+    """
+    Serialize table filtering and sorting state into query parameters.
+
+    Args:
+        global_query (str): Input global query used by the operation.
+        column_filters (Dict[int, str]): Input column filters used by the operation.
+        sort_column (Optional[int]): Navigation or sorting option controlling the result order.
+        sort_direction (str): Navigation or sorting option controlling the result order.
+
+    Returns:
+        Dict[str, str]: Query-parameter mapping for the table state.
+    """
     params: Dict[str, str] = {}
     if global_query:
         params["q"] = global_query
@@ -2394,6 +3530,12 @@ def _table_query_params(
 
 
 def _submitted_sdl_form() -> Dict[str, str]:
+    """
+    Read and normalize SDL form fields from the current request.
+
+    Returns:
+        Dict[str, str]: Normalized SDL form-value dictionary.
+    """
     return {
         header: request.form.get(field_name, "").strip()
         for header, field_name in SDL_FORM_FIELDS.items()
@@ -2401,6 +3543,18 @@ def _submitted_sdl_form() -> Dict[str, str]:
 
 
 def _validate_sdl_form(values: Dict[str, str]) -> Dict[str, Any]:
+    """
+    Validate submitted SDL form values and return field errors.
+
+    Args:
+        values (Dict[str, str]): Input values to validate, transform, or persist.
+
+    Returns:
+        Dict[str, Any]: Validation result containing normalized values and field errors.
+
+    Raises:
+        SDLValidationError: If validation or the underlying resource operation fails.
+    """
     accession_id = values["Accession ID"]
     if not _accession_pattern.fullmatch(accession_id):
         raise SDLValidationError(
@@ -2493,7 +3647,15 @@ def _validate_sdl_form(values: Dict[str, str]) -> Dict[str, Any]:
 
 
 def _strict_sdl_date(value: str) -> Optional[datetime.date]:
-    """Return a calendar date only for canonical YYYY-MM-DD values."""
+    """
+    Return a calendar date only for canonical YYYY-MM-DD values.
+
+    Args:
+        value (str): Input value to validate, transform, or persist.
+
+    Returns:
+        Optional[datetime.date]: Value produced by the operation.
+    """
     if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
         return None
     try:
@@ -2503,13 +3665,30 @@ def _strict_sdl_date(value: str) -> Optional[datetime.date]:
 
 
 def _original_path_parent_name(value: str) -> str:
-    """Return the immediate parent for native or Windows-formatted paths."""
+    """
+    Return the immediate parent for native or Windows-formatted paths.
+
+    Args:
+        value (str): Input value to validate, transform, or persist.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     if "\\" in value:
         return PureWindowsPath(value).parent.name
     return Path(value).parent.name
 
 
 def _sdl_scanner_for_batch(batch_root: Path) -> str:
+    """
+    Resolve the scanner value to use for a batch in the SDL.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+
+    Returns:
+        str: Scanner label selected for the batch.
+    """
     scanner_directory = batch_root.parent.name
     if not scanner_directory.upper().startswith("SS"):
         return "-----"
@@ -2528,7 +3707,16 @@ def _post_qc_sdl_rows(
     batch_root: Path,
     worksheet: Worksheet,
 ) -> List[Dict[str, Any]]:
-    """Build new SDL rows for accessions absent from the workbook."""
+    """
+    Build new SDL rows for accessions absent from the workbook.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+        worksheet (Worksheet): Input worksheet used by the operation.
+
+    Returns:
+        List[Dict[str, Any]]: SDL row dictionaries for accessions missing from the workbook.
+    """
     _, mapping = renaming.read_csv(batch_root / "name_mapping.csv")
     header_columns = _sdl_header_columns(worksheet)
     accession_column = header_columns["Accession ID"]
@@ -2607,7 +3795,15 @@ def _post_qc_sdl_rows(
 
 
 def _update_sdl_after_renaming(batch_root: Path) -> int:
-    """Append missing post-QC rows and return the number added."""
+    """
+    Append missing post-QC rows and return the number added.
+
+    Args:
+        batch_root (Path): Directory used as the batch root.
+
+    Returns:
+        int: Number of SDL rows added.
+    """
     with _sdl_workbook_lock:
         workbook, worksheet, initialized_headers = _load_sdl_workbook()
         try:
@@ -2633,7 +3829,16 @@ def _update_sdl_after_renaming(batch_root: Path) -> int:
 
 
 def _replace_sdl_accession(old_accession: str, new_accession: str) -> int:
-    """Replace an accession in existing SDL rows and return rows changed."""
+    """
+    Replace an accession in existing SDL rows and return rows changed.
+
+    Args:
+        old_accession (str): Input old accession used by the operation.
+        new_accession (str): Input new accession used by the operation.
+
+    Returns:
+        int: Number of SDL rows changed.
+    """
     if old_accession == new_accession:
         return 0
     with _sdl_workbook_lock:
@@ -2658,6 +3863,17 @@ def _render_sdl_page(
     edit_row: Optional[int] = None,
     edit_signature: str = "",
 ):
+    """
+    Render the SDL page with form values and optional edit state.
+
+    Args:
+        form_values (Optional[Dict[str, str]]): Input form values used by the operation.
+        edit_row (Optional[int]): Input edit row used by the operation.
+        edit_signature (str): Input edit signature used by the operation.
+
+    Returns:
+        Response | str: Rendered SDL page response.
+    """
     workbook = None
     try:
         with _sdl_workbook_lock:
@@ -2709,6 +3925,15 @@ def _render_sdl_page(
     }
 
     def displayed_values(row):
+        """
+        Return the row values formatted for the SDL review page.
+
+        Args:
+            row (object): One data row to process.
+
+        Returns:
+            object: Value produced by the operation.
+        """
         values = []
         for header in SDL_HEADERS:
             if header in SDL_STATUS_HEADERS:
@@ -2815,7 +4040,24 @@ def _read_inventory_page(
     sort_column: Optional[int] = None,
     sort_direction: str = "asc",
 ) -> Tuple[List[str], List[List[str]], int, int, int, int]:
-    """Filter and sort a headered inventory CSV before returning one page."""
+    """
+    Filter and sort a headered inventory CSV before returning one page.
+
+    Args:
+        inventory_path (Path): Path to the inventory.
+        requested_page (int): Input requested page used by the operation.
+        rows_per_page (int): Input rows per page used by the operation.
+        global_query (str): Input global query used by the operation.
+        column_filters (Optional[Dict[int, str]]): Input column filters used by the operation.
+        sort_column (Optional[int]): Navigation or sorting option controlling the result order.
+        sort_direction (str): Navigation or sorting option controlling the result order.
+
+    Returns:
+        Tuple[List[str], List[List[str]], int, int, int, int]: Headers, page rows, and pagination counts for the inventory.
+
+    Raises:
+        InventoryReadError: If validation or the underlying resource operation fails.
+    """
     headers: List[str] = []
     matched_rows: List[List[str]] = []
     page_rows: List[List[str]] = []
@@ -2944,6 +4186,21 @@ class TQJob:
         manifest_path: Optional[Path] = None,
         metadata_path: Optional[Path] = None,
     ):
+        """
+        Initialize a TQ transfer job with its process and selected slides.
+
+        Args:
+            job_id (str): Input job id used by the operation.
+            owner_id (str): Identifier of the user associated with the operation.
+            process (Optional[subprocess.Popen]): Input process used by the operation.
+            slides (List[Dict[str, str]]): Input slides used by the operation.
+            all_slides (List[Dict[str, str]]): Input all slides used by the operation.
+            manifest_path (Optional[Path]): Path to the manifest.
+            metadata_path (Optional[Path]): Path to the metadata.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.id = job_id
         self.owner_id = owner_id
         self.process = process
@@ -2961,15 +4218,40 @@ class TQJob:
 
 
 def _tq_append_output(job: TQJob, message: str) -> None:
+    """
+    Append a line of child-process output to a TQ job log.
+
+    Args:
+        job (TQJob): Input job used by the operation.
+        message (str): Input message used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     with _tq_state_lock:
         job.output += message
 
 
 def _tq_staging_root() -> Path:
+    """
+    Return the configured root directory for TQ staging files.
+
+    Returns:
+        Path: Filesystem path produced by the operation.
+    """
     return Path(Config.IMAGE_STAGING_ROOT).expanduser().resolve()
 
 
 def _tq_staging_display_path(path: Path) -> str:
+    """
+    Convert a staging path to the display form used by the TQ UI.
+
+    Args:
+        path (Path): Path to the input file or directory.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     try:
         relative = path.relative_to(_tq_staging_root())
     except ValueError:
@@ -2980,6 +4262,15 @@ def _tq_staging_display_path(path: Path) -> str:
 
 
 def _tq_windows_safe_component(value: str) -> bool:
+    """
+    Check whether a value is safe as one Windows path component.
+
+    Args:
+        value (str): Input value to validate, transform, or persist.
+
+    Returns:
+        bool: True when the component is safe for a Windows path; otherwise False.
+    """
     reserved = {
         "CON",
         "PRN",
@@ -2998,6 +4289,18 @@ def _tq_windows_safe_component(value: str) -> bool:
 
 
 def _tq_staging_path(slide: Dict[str, str]) -> Path:
+    """
+    Return the staging path assigned to a slide.
+
+    Args:
+        slide (Dict[str, str]): Input slide used by the operation.
+
+    Returns:
+        Path: Filesystem path produced by the operation.
+
+    Raises:
+        TQError: If validation or the underlying resource operation fails.
+    """
     staging_dir = slide.get("staging_dir", "")
     parts = staging_dir.split("/")
     if (
@@ -3038,6 +4341,18 @@ def _tq_staging_path(slide: Dict[str, str]) -> Path:
 
 
 def _tq_prepare_staging_paths(slides: List[Dict[str, str]]) -> None:
+    """
+    Create and validate staging paths for the selected slides.
+
+    Args:
+        slides (List[Dict[str, str]]): Input slides used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        TQError: If validation or the underlying resource operation fails.
+    """
     seen = set()
     staging_directories = set()
     for slide in slides:
@@ -3053,6 +4368,12 @@ def _tq_prepare_staging_paths(slides: List[Dict[str, str]]) -> None:
 
 
 def _tq_transfer_log_root() -> Path:
+    """
+    Return the configured root directory for TQ transfer logs.
+
+    Returns:
+        Path: Filesystem path produced by the operation.
+    """
     configured = str(Config.TQ_TRANSFER_LOG_DIR or "").strip()
     return (
         Path(configured).expanduser()
@@ -3062,12 +4383,28 @@ def _tq_transfer_log_root() -> Path:
 
 
 def _tq_slide_id(batch_id: str, original_path: str) -> str:
+    """
+    Build a stable identifier for a slide in a batch.
+
+    Args:
+        batch_id (str): Identifier of the batch to operate on.
+        original_path (str): Path to the original.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     value = f"{batch_id}\0{original_path}".encode("utf-8")
     return hashlib.sha256(value).hexdigest()[:24]
 
 
 def _tq_sdl_accession_metadata(
 ) -> Tuple[Dict[str, Dict[str, List[str]]], Optional[str]]:
+    """
+    Load SDL accession metadata needed by TQ transfers.
+
+    Returns:
+        Tuple[Dict[str, Dict[str, List[str]]], Optional[str]]: Collection produced from the supplied input or stored state.
+    """
     workbook = None
     try:
         with _sdl_workbook_lock:
@@ -3102,6 +4439,18 @@ def _tq_digitization_date(
     accession: str,
     sdl_dates: Dict[str, List[str]],
 ) -> str:
+    """
+    Resolve the digitization date for a slide from SDL data.
+
+    Args:
+        original_path (str): Path to the original.
+        batch_root (Path): Directory used as the batch root.
+        accession (str): Input accession used by the operation.
+        sdl_dates (Dict[str, List[str]]): Input SDL dates used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     original_parent = _strict_sdl_date(_original_path_parent_name(original_path))
     if original_parent:
         return original_parent.isoformat()
@@ -3113,6 +4462,15 @@ def _tq_digitization_date(
 
 
 def _tq_catalog() -> Tuple[List[Dict[str, str]], List[str]]:
+    """
+    Load the batch catalog records available to TQ.
+
+    Returns:
+        Tuple[List[Dict[str, str]], List[str]]: Tuple containing catalog slide records and warnings.
+
+    Raises:
+        renaming.RenamingError: If validation or the underlying resource operation fails.
+    """
     batches, warnings = discover_batches()
     sdl_metadata, sdl_warning = _tq_sdl_accession_metadata()
     if sdl_warning:
@@ -3186,6 +4544,18 @@ def _tq_validate_filter(
     start: str,
     end: str,
 ) -> Optional[str]:
+    """
+    Validate one TQ catalog filter and its optional date range.
+
+    Args:
+        field (str): Field or column metadata used by the operation.
+        value (str): Input value to validate, transform, or persist.
+        start (str): Input start used by the operation.
+        end (str): Input end used by the operation.
+
+    Returns:
+        Optional[str]: Value produced by the operation.
+    """
     if field not in TQ_FILTER_FIELDS:
         return "Choose a valid filter field."
     if field == "PID" and value and not _tq_pid_pattern.fullmatch(value.upper()):
@@ -3215,6 +4585,20 @@ def _tq_filtered_slides(
     end: str,
     sort_order: str,
 ) -> List[Dict[str, str]]:
+    """
+    Filter and sort catalog slides for the TQ interface.
+
+    Args:
+        slides (List[Dict[str, str]]): Input slides used by the operation.
+        field (str): Field or column metadata used by the operation.
+        value (str): Input value to validate, transform, or persist.
+        start (str): Input start used by the operation.
+        end (str): Input end used by the operation.
+        sort_order (str): Navigation or sorting option controlling the result order.
+
+    Returns:
+        List[Dict[str, str]]: Filtered and sorted slide records.
+    """
     attribute = {
         "Organ": "organ",
         "PID": "pid",
@@ -3275,6 +4659,15 @@ def _tq_filtered_slides(
 
 
 def _tq_date_summary(slides: List[Dict[str, str]]) -> str:
+    """
+    Summarize the digitization dates represented by TQ slides.
+
+    Args:
+        slides (List[Dict[str, str]]): Input slides used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     values = sorted(
         {slide["digitization_date"] for slide in slides if slide["digitization_date"]}
     )
@@ -3286,6 +4679,16 @@ def _tq_date_summary(slides: List[Dict[str, str]]) -> str:
 def _tq_grouped_rows(
     slides: List[Dict[str, str]], selection_type: str
 ) -> List[Dict[str, Any]]:
+    """
+    Group TQ slides into rows for the selected display mode.
+
+    Args:
+        slides (List[Dict[str, str]]): Input slides used by the operation.
+        selection_type (str): Input selection type used by the operation.
+
+    Returns:
+        List[Dict[str, Any]]: Grouped rows for display.
+    """
     if selection_type == "Slide":
         return [{"type": "slide", "slide": slide} for slide in slides]
     if selection_type == "Accession":
@@ -3363,6 +4766,16 @@ def _tq_grouped_rows(
 def _tq_sort_grouped_rows(
     rows: List[Dict[str, Any]], sort_order: str
 ) -> List[Dict[str, Any]]:
+    """
+    Sort grouped TQ rows according to the requested order.
+
+    Args:
+        rows (List[Dict[str, Any]]): Data rows to process.
+        sort_order (str): Navigation or sorting option controlling the result order.
+
+    Returns:
+        List[Dict[str, Any]]: Sorted grouped rows.
+    """
     if sort_order not in {"az", "za", "date", "date_reverse"}:
         return rows
     if sort_order in {"az", "za"}:
@@ -3429,6 +4842,18 @@ def _tq_sort_grouped_rows(
 
 
 def _tq_safe_prefix(value: str) -> str:
+    """
+    Normalize a transfer destination prefix for safe use in paths.
+
+    Args:
+        value (str): Input value to validate, transform, or persist.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+
+    Raises:
+        TQError: If validation or the underlying resource operation fails.
+    """
     cleaned = value.strip().replace("\\", "/").strip("/")
     if not cleaned:
         raise TQError("Destination prefix is required.")
@@ -3443,10 +4868,29 @@ def _tq_safe_prefix(value: str) -> str:
 
 
 def _tq_destination_dir(prefix: str, slide: Dict[str, str]) -> str:
+    """
+    Resolve the transfer destination directory for a slide.
+
+    Args:
+        prefix (str): Input prefix used by the operation.
+        slide (Dict[str, str]): Input slide used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     return f"{_tq_safe_prefix(prefix)}/{slide['organ']}/{slide['pid']}"
 
 
 def _tq_config() -> Dict[str, Any]:
+    """
+    Load and validate the persisted TQ configuration.
+
+    Returns:
+        Dict[str, Any]: Validated TQ configuration dictionary.
+
+    Raises:
+        TQError: If validation or the underlying resource operation fails.
+    """
     path = Path(Config.TQ_HOME_DIR).expanduser() / "config.toml"
     try:
         with path.open("rb") as handle:
@@ -3467,6 +4911,18 @@ def _tq_config() -> Dict[str, Any]:
 
 
 def _tq_write_metadata_csv(slides: List[Dict[str, str]]) -> Path:
+    """
+    Write transfer metadata for selected slides to a CSV file.
+
+    Args:
+        slides (List[Dict[str, str]]): Input slides used by the operation.
+
+    Returns:
+        Path: Path to the written transfer metadata CSV.
+
+    Raises:
+        TQError: If validation or the underlying resource operation fails.
+    """
     directory = Path(Config.INSTANCE_DIR) / "tq_manifests"
     directory.mkdir(parents=True, exist_ok=True)
     descriptor, path_value = tempfile.mkstemp(
@@ -3511,6 +4967,16 @@ def _tq_write_metadata_csv(slides: List[Dict[str, str]]) -> Path:
 def _tq_write_manifest(
     slides: List[Dict[str, str]], metadata_path: Path
 ) -> Path:
+    """
+    Write a manifest describing the selected TQ transfer slides.
+
+    Args:
+        slides (List[Dict[str, str]]): Input slides used by the operation.
+        metadata_path (Path): Path to the metadata.
+
+    Returns:
+        Path: Path to the written transfer manifest.
+    """
     directory = Path(Config.INSTANCE_DIR) / "tq_manifests"
     directory.mkdir(parents=True, exist_ok=True)
     descriptor, path_value = tempfile.mkstemp(
@@ -3549,6 +5015,12 @@ def _tq_write_manifest(
 
 
 def _tq_history_successes() -> set:
+    """
+    Return slide identifiers whose prior TQ transfers succeeded.
+
+    Returns:
+        set: Set of slide IDs with successful prior transfers.
+    """
     successes = set()
     root = _tq_transfer_log_root()
     if not root.is_dir():
@@ -3566,6 +5038,15 @@ def _tq_history_successes() -> set:
 
 
 def _tq_update_sdl_push_status(all_slides: List[Dict[str, str]]) -> int:
+    """
+    Mark successfully transferred slides as pushed in the SDL.
+
+    Args:
+        all_slides (List[Dict[str, str]]): Input all slides used by the operation.
+
+    Returns:
+        int: Count, status, or numeric result produced by the operation.
+    """
     successes = _tq_history_successes()
     grouped: Dict[Tuple[str, str], set] = defaultdict(set)
     for slide in all_slides:
@@ -3608,6 +5089,15 @@ def _tq_update_sdl_push_status(all_slides: List[Dict[str, str]]) -> int:
 
 
 def _tq_write_transfer_log(job: TQJob) -> Path:
+    """
+    Write the completed TQ transfer job to its durable log.
+
+    Args:
+        job (TQJob): Input job used by the operation.
+
+    Returns:
+        Path: Path to the durable transfer log.
+    """
     root = _tq_transfer_log_root()
     date_directory = root / job.started_at.strftime("%Y-%m-%d")
     date_directory.mkdir(parents=True, exist_ok=True)
@@ -3656,6 +5146,16 @@ def _tq_write_transfer_log(job: TQJob) -> Path:
 
 
 def _tq_parse_result_line(job: TQJob, line: str) -> None:
+    """
+    Parse one line of TQ output and update job state.
+
+    Args:
+        job (TQJob): Input job used by the operation.
+        line (str): Input line used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     try:
         result = json.loads(line)
     except json.JSONDecodeError:
@@ -3697,6 +5197,15 @@ def _tq_parse_result_line(job: TQJob, line: str) -> None:
 
 
 def _tq_prune_empty_staging_directories(path: Path) -> None:
+    """
+    Remove empty directories left below a TQ staging path.
+
+    Args:
+        path (Path): Path to the input file or directory.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     root = _tq_staging_root()
     current = path.parent
     while current != root:
@@ -3708,6 +5217,15 @@ def _tq_prune_empty_staging_directories(path: Path) -> None:
 
 
 def _tq_cleanup_successful_staging(job: TQJob) -> None:
+    """
+    Remove staging files for slides transferred successfully.
+
+    Args:
+        job (TQJob): Input job used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     for slide in job.slides:
         result = job.results.get(slide["original_path"])
         staged_value = slide.get("staged_path")
@@ -3726,6 +5244,18 @@ def _tq_cleanup_successful_staging(job: TQJob) -> None:
 
 
 def _tq_download_slides(job: TQJob) -> None:
+    """
+    Download the selected slides into the TQ staging area.
+
+    Args:
+        job (TQJob): Input job used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        TQError: If validation or the underlying resource operation fails.
+    """
     for index, slide in enumerate(job.slides, start=1):
         source = Path(slide["original_path"])
         target = Path(slide["staged_path"])
@@ -3775,6 +5305,15 @@ def _tq_download_slides(job: TQJob) -> None:
 
 
 def _tq_temporary_csv(prefix: str) -> Path:
+    """
+    Create a private temporary CSV path for a TQ operation.
+
+    Args:
+        prefix (str): Input prefix used by the operation.
+
+    Returns:
+        Path: Filesystem path produced by the operation.
+    """
     directory = Path(Config.INSTANCE_DIR) / "tq_manifests"
     directory.mkdir(parents=True, exist_ok=True)
     descriptor, path_value = tempfile.mkstemp(
@@ -3785,6 +5324,16 @@ def _tq_temporary_csv(prefix: str) -> Path:
 
 
 def _tq_stream_process_output(job: TQJob, process: subprocess.Popen) -> None:
+    """
+    Stream child-process output into a TQ job record.
+
+    Args:
+        job (TQJob): Input job used by the operation.
+        process (subprocess.Popen): Input process used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
     if process.stdout is not None:
         while True:
@@ -3798,6 +5347,18 @@ def _tq_stream_process_output(job: TQJob, process: subprocess.Popen) -> None:
 
 
 def _tq_deidentify_slides(job: TQJob) -> None:
+    """
+    De-identify staged slides before transfer.
+
+    Args:
+        job (TQJob): Input job used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        TQError: If validation or the underlying resource operation fails.
+    """
     output_log = _tq_temporary_csv("deidentify-results-")
     try:
         staging_directory = Path(job.slides[0]["staged_path"]).parent
@@ -3845,6 +5406,16 @@ def _tq_deidentify_slides(job: TQJob) -> None:
 
 
 def _tq_fail_before_upload(job: TQJob, error: Exception) -> None:
+    """
+    Record a TQ job failure that occurs before upload.
+
+    Args:
+        job (TQJob): Input job used by the operation.
+        error (Exception): Exception information supplied by the runtime.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     for slide in job.slides:
         job.result_errors.setdefault(
             slide["original_path"],
@@ -3859,6 +5430,15 @@ def _tq_fail_before_upload(job: TQJob, error: Exception) -> None:
 
 
 def _run_tq_job(job: TQJob) -> None:
+    """
+    Run the complete TQ transfer workflow for a background job.
+
+    Args:
+        job (TQJob): Input job used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     global _tq_active_job_id
     try:
         _tq_download_slides(job)
@@ -3890,12 +5470,33 @@ def _run_tq_job(job: TQJob) -> None:
 
 
 def _tq_cleanup_job_files(job: TQJob) -> None:
+    """
+    Remove temporary files associated with a TQ job.
+
+    Args:
+        job (TQJob): Input job used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     for path in (job.manifest_path, job.metadata_path):
         if path is not None:
             path.unlink(missing_ok=True)
 
 
 def _read_tq_output(job: TQJob) -> None:
+    """
+    Read persisted output for a TQ job into its state.
+
+    Args:
+        job (TQJob): Input job used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        TQError: If validation or the underlying resource operation fails.
+    """
     global _tq_active_job_id
     decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
     pending = ""
@@ -3962,6 +5563,20 @@ def _start_tq_job(
     slides: List[Dict[str, str]],
     all_slides: List[Dict[str, str]],
 ) -> TQJob:
+    """
+    Create and start a background TQ transfer job.
+
+    Args:
+        owner_id (str): Identifier of the user associated with the operation.
+        slides (List[Dict[str, str]]): Input slides used by the operation.
+        all_slides (List[Dict[str, str]]): Input all slides used by the operation.
+
+    Returns:
+        TQJob: Initialized TQ job object.
+
+    Raises:
+        TQError: If validation or the underlying resource operation fails.
+    """
     global _tq_active_job_id
     _tq_config()
     _tq_prepare_staging_paths(slides)
@@ -3985,6 +5600,15 @@ def _start_tq_job(
 
 
 def _tq_job_for_user(job_id: Optional[str]) -> Optional[TQJob]:
+    """
+    Return a TQ job when it belongs to the requested user.
+
+    Args:
+        job_id (Optional[str]): Input job id used by the operation.
+
+    Returns:
+        Optional[TQJob]: TQ job when owned by the user, otherwise None.
+    """
     if not job_id:
         return None
     with _tq_state_lock:
@@ -3997,6 +5621,19 @@ def _tq_job_for_user(job_id: Optional[str]) -> Optional[TQJob]:
 
 
 def _tq_safe_path(relative_path: str, expected: str = "any") -> Path:
+    """
+    Resolve a user-supplied TQ path below an allowed root.
+
+    Args:
+        relative_path (str): Path to the relative.
+        expected (str): Input expected used by the operation.
+
+    Returns:
+        Path: Resolved path below an allowed TQ root.
+
+    Raises:
+        TQError: If validation or the underlying resource operation fails.
+    """
     root = Path(Config.TQ_HOME_DIR).expanduser().resolve()
     normalized = relative_path.replace("\\", "/").strip("/")
     if not normalized:
@@ -4026,11 +5663,32 @@ def _tq_safe_path(relative_path: str, expected: str = "any") -> Path:
 
 
 def _tq_relative_path(path: Path) -> str:
+    """
+    Return a normalized path relative to the TQ workspace.
+
+    Args:
+        path (Path): Path to the input file or directory.
+
+    Returns:
+        str: Normalized path relative to the TQ workspace.
+    """
     root = Path(Config.TQ_HOME_DIR).expanduser().resolve()
     return str(path.resolve().relative_to(root)).replace(os.sep, "/")
 
 
 def _save_tq_config(contents: str) -> None:
+    """
+    Validate and persist TQ configuration contents.
+
+    Args:
+        contents (str): Input contents to validate, transform, or persist.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        TQError: If validation or the underlying resource operation fails.
+    """
     if len(contents.encode("utf-8")) > 1024 * 1024:
         raise TQError("config.toml cannot exceed 1 MiB.")
     try:
@@ -4090,6 +5748,18 @@ class PipelineJob:
         process: subprocess.Popen,
         output_path: Optional[str] = None,
     ):
+        """
+        Initialize a pipeline job with its child process and output path.
+
+        Args:
+            job_id (str): Input job id used by the operation.
+            owner_id (str): Identifier of the user associated with the operation.
+            process (subprocess.Popen): Input process used by the operation.
+            output_path (Optional[str]): Path to the output.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.id = job_id
         self.owner_id = owner_id
         self.process = process
@@ -4105,6 +5775,15 @@ _pipeline_active_job_id: Optional[str] = None
 
 
 def _pipeline_form_values(source=None) -> Dict[str, str]:
+    """
+    Read and normalize pipeline form values from a request source.
+
+    Args:
+        source (object): Input source used by the operation.
+
+    Returns:
+        Dict[str, str]: Normalized pipeline form-value dictionary.
+    """
     values = dict(PIPELINE_FORM_DEFAULTS)
     if source is not None:
         for key in values:
@@ -4121,6 +5800,22 @@ def _positive_pipeline_integer(
     errors: List[str],
     maximum: int,
 ) -> Optional[int]:
+    """
+    Validate a positive integer pipeline option.
+
+    Args:
+        values (Dict[str, str]): Input values to validate, transform, or persist.
+        field (str): Field or column metadata used by the operation.
+        label (str): Input label used by the operation.
+        errors (List[str]): Input errors used by the operation.
+        maximum (int): Input maximum used by the operation.
+
+    Returns:
+        Optional[int]: Value produced by the operation.
+
+    Raises:
+        ValueError: If validation or the underlying resource operation fails.
+    """
     try:
         value = int(values[field])
         if value <= 0:
@@ -4134,6 +5829,15 @@ def _positive_pipeline_integer(
 
 
 def _pipeline_allowed_roots(config_key: str) -> List[Path]:
+    """
+    Return configured filesystem roots allowed for pipeline paths.
+
+    Args:
+        config_key (str): Input config key used by the operation.
+
+    Returns:
+        List[Path]: Configured allowed pipeline root paths.
+    """
     configured = app.config.get(config_key, ())
     if isinstance(configured, str):
         configured = [item for item in configured.split(os.pathsep) if item]
@@ -4141,6 +5845,16 @@ def _pipeline_allowed_roots(config_key: str) -> List[Path]:
 
 
 def _pipeline_path_is_allowed(candidate: Path, roots: List[Path]) -> bool:
+    """
+    Check whether a pipeline path is below one of the allowed roots.
+
+    Args:
+        candidate (Path): Input candidate used by the operation.
+        roots (List[Path]): Input roots used by the operation.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+    """
     for root in roots:
         try:
             candidate.relative_to(root)
@@ -4151,6 +5865,17 @@ def _pipeline_path_is_allowed(candidate: Path, roots: List[Path]) -> bool:
 
 
 def _pipeline_extensions(value: str, label: str, errors: List[str]) -> List[str]:
+    """
+    Parse and validate a pipeline extension list.
+
+    Args:
+        value (str): Input value to validate, transform, or persist.
+        label (str): Input label used by the operation.
+        errors (List[str]): Input errors used by the operation.
+
+    Returns:
+        List[str]: Normalized pipeline file-extension list.
+    """
     extensions = [item.lstrip(".") for item in re.split(r"[\s,]+", value.strip()) if item]
     if not extensions:
         errors.append(f"{label} must contain at least one extension.")
@@ -4160,6 +5885,18 @@ def _pipeline_extensions(value: str, label: str, errors: List[str]) -> List[str]
 
 
 def _pipeline_command(values: Dict[str, str]) -> Tuple[Optional[List[str]], List[str]]:
+    """
+    Build the validated child command for a pipeline request.
+
+    Args:
+        values (Dict[str, str]): Input values to validate, transform, or persist.
+
+    Returns:
+        Tuple[Optional[List[str]], List[str]]: Tuple containing the child command and validation errors.
+
+    Raises:
+        ValueError: If validation or the underlying resource operation fails.
+    """
     errors: List[str] = []
     input_text = values["input_dir"].strip()
     output_text = values["output_dir"].strip()
@@ -4291,7 +6028,15 @@ def _pipeline_command(values: Dict[str, str]) -> Tuple[Optional[List[str]], List
 
 
 def _read_pipeline_output(job: PipelineJob) -> None:
-    """Drain merged child output and finalize job state."""
+    """
+    Drain merged child output and finalize job state.
+
+    Args:
+        job (PipelineJob): Input job used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     global _pipeline_active_job_id
     decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
     try:
@@ -4356,6 +6101,24 @@ def _start_pipeline_job(
     idempotency_key: Optional[str] = None,
     payload_hash: Optional[str] = None,
 ) -> PipelineJob:
+    """
+    Start the pipeline job.
+
+    Args:
+        command (List[str]): Input command used by the operation.
+        owner_id (str): Identifier of the user associated with the operation.
+        job_id (Optional[str]): Input job id used by the operation.
+        request_values (Optional[Dict[str, Any]]): Input request values used by the operation.
+        token_id (Optional[str]): Input token id used by the operation.
+        idempotency_key (Optional[str]): Input idempotency key used by the operation.
+        payload_hash (Optional[str]): Input payload hash used by the operation.
+
+    Returns:
+        PipelineJob: Initialized pipeline job object.
+
+    Raises:
+        RuntimeError: If validation or the underlying resource operation fails.
+    """
     global _pipeline_active_job_id
     with _pipeline_jobs_lock:
         if _pipeline_active_job_id is not None:
@@ -4409,6 +6172,15 @@ def _start_pipeline_job(
 
 
 def _pipeline_job_for_user(job_id: str) -> Optional[PipelineJob]:
+    """
+    Return a pipeline job when it belongs to the requested user.
+
+    Args:
+        job_id (str): Input job id used by the operation.
+
+    Returns:
+        Optional[PipelineJob]: Pipeline job when owned by the user, otherwise None.
+    """
     with _pipeline_jobs_lock:
         job = _pipeline_jobs.get(job_id)
         if job is None:
@@ -4419,6 +6191,12 @@ def _pipeline_job_for_user(job_id: str) -> Optional[PipelineJob]:
 
 
 def _pipeline_is_busy() -> bool:
+    """
+    Return whether another pipeline job is currently active.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+    """
     with _pipeline_jobs_lock:
         if _pipeline_active_job_id is None:
             return False
@@ -4427,6 +6205,12 @@ def _pipeline_is_busy() -> bool:
 
 
 def csrf_token() -> str:
+    """
+    Return the current session CSRF token, creating one when necessary.
+
+    Returns:
+        str: Session CSRF token string.
+    """
     token = session.get("_csrf_token")
     if not token:
         token = secrets.token_urlsafe(32)
@@ -4438,7 +6222,12 @@ app.jinja_env.globals["csrf_token"] = csrf_token
 
 
 def csp_nonce() -> str:
-    """Return the per-request nonce used by inline application assets."""
+    """
+    Return the per-request nonce used by inline application assets.
+
+    Returns:
+        str: Per-request CSP nonce string.
+    """
     nonce = getattr(g, "csp_nonce", None)
     if nonce is None:
         nonce = secrets.token_urlsafe(16)
@@ -4450,7 +6239,15 @@ app.jinja_env.globals["csp_nonce"] = csp_nonce
 
 
 def safe_login_redirect(value: Optional[str]) -> Optional[str]:
-    """Accept only root-relative paths on this application."""
+    """
+    Accept only root-relative paths on this application.
+
+    Args:
+        value (Optional[str]): Input value to validate, transform, or persist.
+
+    Returns:
+        Optional[str]: Validated root-relative redirect path, or None.
+    """
     if not value or not value.startswith("/") or value.startswith("//"):
         return None
     if "\\" in value or any(ord(character) < 0x20 for character in value):
@@ -4465,10 +6262,28 @@ def safe_login_redirect(value: Optional[str]) -> Optional[str]:
 
 
 def admin_required(view):
-    """Require an authenticated administrator for a browser route."""
+    """
+    Require an authenticated administrator for a browser route.
+
+    Args:
+        view (object): Input view used by the operation.
+
+    Returns:
+        object: Value produced by the operation.
+    """
     @functools.wraps(view)
     @login_required
     def wrapped(*args, **kwargs):
+        """
+        Invoke the protected view after checking administrator access.
+
+        Args:
+            *args (object): Input args used by the operation.
+            **kwargs (object): Input kwargs used by the operation.
+
+        Returns:
+            object: Response produced by the protected view.
+        """
         if not current_user.is_admin:
             abort(403)
         return view(*args, **kwargs)
@@ -4477,6 +6292,18 @@ def admin_required(view):
 
 
 def _api_problem(status: int, code: str, title: str, detail: str):
+    """
+    Build a standards-compliant JSON problem response for an API error.
+
+    Args:
+        status (int): Input status used by the operation.
+        code (str): Input code used by the operation.
+        title (str): Input title used by the operation.
+        detail (str): Input detail used by the operation.
+
+    Returns:
+        object: JSON API problem response.
+    """
     response = jsonify(
         {
             "type": f"https://label-check.invalid/problems/{code}",
@@ -4495,9 +6322,38 @@ def _api_problem(status: int, code: str, title: str, detail: str):
 
 
 def _require_api_scope(scope: str, bucket: str = "read"):
+    """
+    Authenticate an API request, enforce its scope, and apply rate limiting.
+
+    Args:
+        scope (str): Requested query or API scope.
+        bucket (str): Input bucket used by the operation.
+
+    Returns:
+        object: Value produced by the operation.
+    """
     def decorator(view):
+        """
+        Create a view decorator that enforces API scope and rate limits.
+
+        Args:
+            view (object): Input view used by the operation.
+
+        Returns:
+            object: Decorated view callable.
+        """
         @functools.wraps(view)
         def wrapped(*args, **kwargs):
+            """
+            Invoke the API view after authentication, scope, and rate-limit checks.
+
+            Args:
+                *args (object): Input args used by the operation.
+                **kwargs (object): Input kwargs used by the operation.
+
+            Returns:
+                object: Response produced by the protected view.
+            """
             if app.config.get("API_REQUIRE_HTTPS", True) and not app.testing and not request.is_secure:
                 return _api_problem(400, "https_required", "HTTPS required", "The API is available only over HTTPS.")
             header = request.headers.get("Authorization", "")
@@ -4532,6 +6388,15 @@ def _require_api_scope(scope: str, bucket: str = "read"):
 
 
 def _api_job_document(record: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert stored pipeline-job metadata into an API response document.
+
+    Args:
+        record (Dict[str, Any]): One data row to process.
+
+    Returns:
+        Dict[str, Any]: Public API representation of the job metadata.
+    """
     job_id = record["job_id"]
     return {
         "id": job_id,
@@ -4549,6 +6414,15 @@ def _api_job_document(record: Dict[str, Any]) -> Dict[str, Any]:
 
 @app.after_request
 def response_security_metadata(response):
+    """
+    Attach security, request-tracing, and API rate-limit headers to a response.
+
+    Args:
+        response (object): Input response used by the operation.
+
+    Returns:
+        object: The response with security metadata attached.
+    """
     nonce = csp_nonce()
     response.headers["Content-Security-Policy"] = "; ".join(
         (
@@ -4598,6 +6472,15 @@ def response_security_metadata(response):
 
 @app.errorhandler(404)
 def api_not_found(error):
+    """
+    Return an API problem response for a missing resource.
+
+    Args:
+        error (object): Exception information supplied by the runtime.
+
+    Returns:
+        object: Value produced by the operation.
+    """
     if request.path.startswith("/api/v1/"):
         return _api_problem(404, "not_found", "Not found", "The requested API resource does not exist.")
     return error
@@ -4605,6 +6488,15 @@ def api_not_found(error):
 
 @app.errorhandler(405)
 def api_method_not_allowed(error):
+    """
+    Return an API problem response for an unsupported method.
+
+    Args:
+        error (object): Exception information supplied by the runtime.
+
+    Returns:
+        object: Value produced by the operation.
+    """
     if request.path.startswith("/api/v1/"):
         return _api_problem(405, "method_not_allowed", "Method not allowed", "This API resource does not support the requested method.")
     return error
@@ -4612,6 +6504,15 @@ def api_method_not_allowed(error):
 
 @app.errorhandler(500)
 def api_internal_error(error):
+    """
+    Return an API problem response for an internal failure.
+
+    Args:
+        error (object): Exception information supplied by the runtime.
+
+    Returns:
+        object: Value produced by the operation.
+    """
     if request.path.startswith("/api/v1/"):
         return _api_problem(500, "internal_error", "Internal server error", "The request could not be completed.")
     return error
@@ -4622,6 +6523,12 @@ def api_internal_error(error):
 # ==============================================================================
 @app.before_request
 def before_request_handler():
+    """
+    Apply request-wide security checks, identifiers, presence tracking, and defaults.
+
+    Returns:
+        tuple: Collection produced from the supplied input or stored state.
+    """
     g.csp_nonce = secrets.token_urlsafe(16)
     if not app.testing:
         try:
@@ -4670,6 +6577,12 @@ def before_request_handler():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    """
+    Authenticate a user and render or redirect the login flow.
+
+    Returns:
+        Response | str | tuple: HTTP response or rendered page for the request.
+    """
     if current_user.is_authenticated:
         return redirect(url_for("index"))
 
@@ -4736,6 +6649,12 @@ def login():
 @app.route("/logout")
 @login_required
 def logout():
+    """
+    End the current user's session and redirect to the login page.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     logout_user()
     flash("You have been logged out.", "info")
     return redirect(url_for("login"))
@@ -4744,6 +6663,12 @@ def logout():
 @app.route("/users")
 @login_required
 def users_management():
+    """
+    Render the administrator's user-management page.
+
+    Returns:
+        Response | str: Value produced by the operation.
+    """
     if not current_user.is_admin:
         flash("You do not have permission to access this page.", "error")
         return redirect(url_for("index"))
@@ -4755,6 +6680,12 @@ def users_management():
 @app.route("/add_user", methods=["POST"])
 @login_required
 def add_user():
+    """
+    Create a user account from the submitted administrator form.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     if not current_user.is_admin:
         return redirect(url_for("index"))
         
@@ -4787,6 +6718,12 @@ def add_user():
 @app.route("/", methods=["GET"])
 @login_required
 def index():
+    """
+    Render the primary review interface and select the active work item.
+
+    Returns:
+        Response | str: Value produced by the operation.
+    """
     requested_index = request.args.get("index")
     if requested_index is not None:
         return redirect(url_for("qc", index=requested_index))
@@ -4803,6 +6740,15 @@ def index():
 
 
 def _statistics_dashboard(user_id: str) -> Dict[str, Any]:
+    """
+    Build dashboard statistics for one user.
+
+    Args:
+        user_id (str): Identifier of the user associated with the operation.
+
+    Returns:
+        Dict[str, Any]: Dashboard statistics dictionary for the user.
+    """
     statistics = stats_store.dashboard(user_id)
     statistics["chart_max"] = max(
         1,
@@ -4816,6 +6762,12 @@ def _statistics_dashboard(user_id: str) -> Dict[str, Any]:
 
 
 def _admin_statistics_user() -> User:
+    """
+    Resolve the administrator-selected user for statistics pages.
+
+    Returns:
+        User: Value produced by the operation.
+    """
     user_id = request.args.get("user_id", "")
     user = user_manager.get(user_id) if user_id else None
     if user is None:
@@ -4826,6 +6778,12 @@ def _admin_statistics_user() -> User:
 @app.route("/admin/statistics")
 @admin_required
 def admin_user_statistics():
+    """
+    Render statistics for the administrator-selected user.
+
+    Returns:
+        str: Rendered statistics page response.
+    """
     user = _admin_statistics_user()
     return render_template(
         "index.html",
@@ -4842,6 +6800,12 @@ def admin_user_statistics():
 @app.route("/statistics/heartbeat", methods=["POST"])
 @login_required
 def statistics_heartbeat():
+    """
+    Record one statistics heartbeat for the current user.
+
+    Returns:
+        Response: JSON response acknowledging the heartbeat.
+    """
     credited = stats_store.heartbeat(str(current_user.id))
     return jsonify(
         {
@@ -4854,6 +6818,12 @@ def statistics_heartbeat():
 @app.route("/statistics/lifetime")
 @login_required
 def lifetime_statistics():
+    """
+    Render lifetime statistics for the current user.
+
+    Returns:
+        str: Rendered lifetime-statistics page response.
+    """
     rows = stats_store.read_csv(str(current_user.id))
     return render_template(
         "lifetime_statistics.html",
@@ -4867,6 +6837,12 @@ def lifetime_statistics():
 @app.route("/statistics/lifetime.csv")
 @login_required
 def download_lifetime_statistics():
+    """
+    Download the lifetime statistics.
+
+    Returns:
+        Response: CSV download response.
+    """
     path = stats_store.csv_path(str(current_user.id))
     if not path.is_file():
         stats_store.rollup_user(str(current_user.id))
@@ -4881,6 +6857,12 @@ def download_lifetime_statistics():
 @app.route("/admin/statistics/lifetime")
 @admin_required
 def admin_user_lifetime_statistics():
+    """
+    Render lifetime statistics for the administrator-selected user.
+
+    Returns:
+        str: Rendered administrator statistics page response.
+    """
     user = _admin_statistics_user()
     rows = stats_store.read_csv(str(user.id))
     return render_template(
@@ -4897,6 +6879,12 @@ def admin_user_lifetime_statistics():
 @app.route("/admin/statistics/lifetime.csv")
 @admin_required
 def admin_download_lifetime_statistics():
+    """
+    Download lifetime statistics for the administrator-selected user.
+
+    Returns:
+        Response: CSV download response for the selected user.
+    """
     user = _admin_statistics_user()
     path = stats_store.csv_path(str(user.id))
     if not path.is_file():
@@ -4912,6 +6900,12 @@ def admin_download_lifetime_statistics():
 @app.route("/tq", methods=["GET"])
 @login_required
 def tq_page():
+    """
+    Render the TQ transfer queue page.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     all_slides, discovery_warnings = _tq_catalog()
     selection_type = request.args.get("select", "Batch")
     if selection_type not in {"Batch", "Accession", "Slide", "Type"}:
@@ -4990,6 +6984,12 @@ def tq_page():
 @app.route("/tq/review", methods=["POST"])
 @login_required
 def tq_review():
+    """
+    Render the TQ transfer review for the selected slides.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     requested_ids = set(request.form.getlist("slide_id"))
     all_slides, _ = _tq_catalog()
     valid_ids = {slide["id"] for slide in all_slides}
@@ -5010,6 +7010,12 @@ def tq_review():
 @app.route("/tq/draft", methods=["POST"])
 @login_required
 def tq_save_draft():
+    """
+    Save the current TQ transfer selection as a draft.
+
+    Returns:
+        Response | tuple: Value produced by the operation.
+    """
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return jsonify({"success": False, "message": "Invalid draft request."}), 400
@@ -5045,6 +7051,12 @@ def tq_save_draft():
 @app.route("/tq/reset", methods=["POST"])
 @login_required
 def tq_reset():
+    """
+    Reset the current TQ transfer draft.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     with _tq_state_lock:
         _tq_drafts.pop(str(current_user.id), None)
     flash("The transfer draft was cleared.", "success")
@@ -5054,6 +7066,12 @@ def tq_reset():
 @app.route("/tq/transfer", methods=["POST"])
 @login_required
 def tq_transfer():
+    """
+    Start a TQ transfer job for the selected slides.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     owner_id = str(current_user.id)
     with _tq_state_lock:
         draft = _tq_drafts.get(owner_id)
@@ -5092,6 +7110,15 @@ def tq_transfer():
 @app.route("/tq/jobs/<job_id>/output", methods=["GET"])
 @login_required
 def tq_job_output(job_id: str):
+    """
+    Return output for an authorized TQ job.
+
+    Args:
+        job_id (str): Input job id used by the operation.
+
+    Returns:
+        Response | tuple: Value produced by the operation.
+    """
     job = _tq_job_for_user(job_id)
     if job is None:
         return jsonify({"error": "Transfer job not found."}), 404
@@ -5118,6 +7145,15 @@ def tq_job_output(job_id: str):
 @app.route("/tq/logs", methods=["GET"])
 @login_required
 def tq_logs():
+    """
+    Render TQ transfer logs for the current user.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+
+    Raises:
+        TQError: If validation or the underlying resource operation fails.
+    """
     root = Path(Config.TQ_HOME_DIR).expanduser().resolve()
     entries: List[Dict[str, Any]] = []
     breadcrumbs = [{"name": ".tq", "path": ""}]
@@ -5183,6 +7219,15 @@ def tq_logs():
 @app.route("/tq/config", methods=["GET", "POST"])
 @admin_required
 def tq_edit_config():
+    """
+    Render or save TQ configuration values.
+
+    Returns:
+        Response | str: Value produced by the operation.
+
+    Raises:
+        TQError: If validation or the underlying resource operation fails.
+    """
     config_path = Path(Config.TQ_HOME_DIR).expanduser() / "config.toml"
     if request.method == "POST":
         contents = request.form.get("config_text", "")
@@ -5229,6 +7274,12 @@ def tq_edit_config():
 @app.route("/renaming", methods=["GET"])
 @login_required
 def renaming_page():
+    """
+    Render the post-QC renaming workflow for available batches.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     all_batches, discovery_warnings = discover_batches()
     _resume_longitudinal_jobs(all_batches)
     batches = [
@@ -5296,6 +7347,15 @@ def renaming_page():
 @app.route("/renaming/status/<batch_id>", methods=["GET"])
 @login_required
 def renaming_status(batch_id: str):
+    """
+    Return the current renaming-job status for a batch.
+
+    Args:
+        batch_id (str): Identifier of the batch to operate on.
+
+    Returns:
+        Response | tuple: Value produced by the operation.
+    """
     context = _renaming_context(batch_id)
     if context is None:
         return jsonify({"status": "unavailable", "error": "Batch not found."}), 404
@@ -5308,6 +7368,15 @@ def renaming_status(batch_id: str):
 @app.route("/renaming/history/retry/<batch_id>", methods=["POST"])
 @login_required
 def renaming_history_retry(batch_id: str):
+    """
+    Retry longitudinal history preparation for a batch.
+
+    Args:
+        batch_id (str): Identifier of the batch to operate on.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     batches, _ = discover_batches()
     context = next((batch for batch in batches if batch.id == batch_id), None)
     if context is None or not context.completed_stages["QC"]:
@@ -5322,6 +7391,15 @@ def renaming_history_retry(batch_id: str):
 @app.route("/renaming/prepare/<batch_id>", methods=["POST"])
 @login_required
 def renaming_prepare(batch_id: str):
+    """
+    Start renaming preparation for a batch.
+
+    Args:
+        batch_id (str): Identifier of the batch to operate on.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     context = _renaming_context(batch_id)
     if context is None:
         flash("The batch is no longer available for renaming.", "warning")
@@ -5334,6 +7412,15 @@ def renaming_prepare(batch_id: str):
 @app.route("/renaming/retry/<batch_id>", methods=["POST"])
 @login_required
 def renaming_retry(batch_id: str):
+    """
+    Retry a failed accession-group renaming operation.
+
+    Args:
+        batch_id (str): Identifier of the batch to operate on.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     context = _renaming_context(batch_id)
     if context is None:
         flash("The batch is no longer available for renaming.", "warning")
@@ -5357,7 +7444,21 @@ def _renaming_group_html(
     accession: str,
     signature: str,
 ) -> str:
-    """Render one current mapping group for an in-page approval update."""
+    """
+    Render one current mapping group for an in-page approval update.
+
+    Args:
+        context (BatchContext): Input context used by the operation.
+        rows (List[Dict[str, str]]): Data rows to process.
+        accession (str): Input accession used by the operation.
+        signature (str): Input signature used by the operation.
+
+    Returns:
+        str: Rendered HTML fragment for the mapping group.
+
+    Raises:
+        renaming.RenamingError: If validation or the underlying resource operation fails.
+    """
     reports = renaming.report_rows(context.root, Path(Config.COPATH_CLONE))
     group = next(
         (
@@ -5386,7 +7487,17 @@ def _renaming_groups_with_image_links(
     rows: List[Dict[str, str]],
     reports: Dict[str, Dict[str, str]],
 ) -> List[Dict[str, object]]:
-    """Group mappings and attach safe, existing label/macro image URLs."""
+    """
+    Group mappings and attach safe, existing label/macro image URLs.
+
+    Args:
+        context (BatchContext): Input context used by the operation.
+        rows (List[Dict[str, str]]): Data rows to process.
+        reports (Dict[str, Dict[str, str]]): Input reports used by the operation.
+
+    Returns:
+        List[Dict[str, object]]: Mapping groups with safe image URLs.
+    """
     _, enriched_rows = renaming.read_csv(context.root / "enriched.csv")
     images_by_slide = {
         row.get("original_slide_path", ""): row
@@ -5419,6 +7530,18 @@ def _renaming_groups_with_image_links(
 @app.route("/renaming/pid/<batch_id>", methods=["GET"])
 @login_required
 def renaming_pid(batch_id: str):
+    """
+    Return the current PID assignment for a renaming batch.
+
+    Args:
+        batch_id (str): Identifier of the batch to operate on.
+
+    Returns:
+        Response | tuple: Value produced by the operation.
+
+    Raises:
+        renaming.RenamingError: If validation or the underlying resource operation fails.
+    """
     context = _renaming_context(batch_id)
     if context is None:
         return jsonify({
@@ -5458,6 +7581,18 @@ def renaming_pid(batch_id: str):
 @app.route("/renaming/approve/<batch_id>", methods=["POST"])
 @login_required
 def renaming_approve(batch_id: str):
+    """
+    Approve a renaming mapping group and finalize its updates.
+
+    Args:
+        batch_id (str): Identifier of the batch to operate on.
+
+    Returns:
+        Response | tuple: Value produced by the operation.
+
+    Raises:
+        renaming.RenamingError: If validation or the underlying resource operation fails.
+    """
     wants_json = request.accept_mimetypes.best == "application/json"
     context = _renaming_context(batch_id)
     if context is None:
@@ -5643,6 +7778,12 @@ def renaming_approve(batch_id: str):
 @app.route("/pipeline", methods=["GET"])
 @login_required
 def pipeline_launcher():
+    """
+    Render the pipeline launcher interface.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     job = None
     job_id = session.get("pipeline_job_id")
     if job_id:
@@ -5659,6 +7800,12 @@ def pipeline_launcher():
 @app.route("/pipeline/run", methods=["POST"])
 @login_required
 def run_pipeline():
+    """
+    Validate a pipeline request and start its background job.
+
+    Returns:
+        Response | tuple: Value produced by the operation.
+    """
     values = _pipeline_form_values(request.form)
     command, errors = _pipeline_command(values)
     if errors:
@@ -5710,6 +7857,15 @@ def run_pipeline():
 @app.route("/pipeline/jobs/<job_id>/output", methods=["GET"])
 @login_required
 def pipeline_job_output(job_id: str):
+    """
+    Return output for an authorized pipeline job.
+
+    Args:
+        job_id (str): Input job id used by the operation.
+
+    Returns:
+        Response | tuple: Value produced by the operation.
+    """
     job = _pipeline_job_for_user(job_id)
     if job is None:
         return jsonify({"error": "Pipeline job not found."}), 404
@@ -5737,6 +7893,15 @@ def pipeline_job_output(job_id: str):
 @app.route("/inventories", methods=["GET"])
 @login_required
 def inventories():
+    """
+    Render the scanner inventory browser and its current page.
+
+    Returns:
+        Response | str: Value produced by the operation.
+
+    Raises:
+        InventoryReadError: If validation or the underlying resource operation fails.
+    """
     inventory_directory = Path(Config.SCANNER_INVENTORIES)
     inventory_files: List[Path] = []
     directory_error = None
@@ -5905,6 +8070,15 @@ def inventories():
 @app.route("/sdl", methods=["GET", "POST"])
 @login_required
 def sdl():
+    """
+    Render or update the slide digitization log interface.
+
+    Returns:
+        Response | object: Value produced by the operation.
+
+    Raises:
+        SDLValidationError: If validation or the underlying resource operation fails.
+    """
     if request.method == "GET":
         requested_row = request.args.get("edit_row", "").strip()
         if not requested_row:
@@ -6071,6 +8245,15 @@ def sdl():
 @app.route("/qc", methods=["GET"])
 @login_required
 def qc():
+    """
+    Render or process the quality-control review interface.
+
+    Returns:
+        Response | str: Value produced by the operation.
+
+    Raises:
+        ValueError: If validation or the underlying resource operation fails.
+    """
     context, available_batches, discovery_warnings = _selected_batch()
     if context is None:
         return render_template(
@@ -6144,6 +8327,15 @@ def qc():
     label_image_exists, macro_image_exists = False, False
 
     def resolve_image_path(csv_path_key):
+        """
+        Resolve an image path from a CSV field while enforcing the allowed batch root.
+
+        Args:
+            csv_path_key (object): Input CSV path key used by the operation.
+
+        Returns:
+            tuple: Collection produced from the supplied input or stored state.
+        """
         csv_path = display_row_data.get(csv_path_key)
         if csv_path:
             full_path = data_manager.get_absolute_path(csv_path)
@@ -6203,7 +8395,15 @@ def qc():
 @app.route("/update", methods=["POST"])
 @login_required
 def update():
-    """Handles the form submission for saving corrections."""
+    """
+    Handles the form submission for saving corrections.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+
+    Raises:
+        ValueError: If validation or the underlying resource operation fails.
+    """
     context, _, _ = _selected_batch(allow_completed=True)
     if context is None:
         flash("The selected batch is no longer available.", "warning")
@@ -6356,6 +8556,12 @@ def update():
 @app.route("/history")
 @login_required
 def history():
+    """
+    Render the current user's correction history.
+
+    Returns:
+        Response | str: Value produced by the operation.
+    """
     context, _, _ = _selected_batch(allow_completed=True)
     if context is None:
         flash("Choose a batch to view its history.", "warning")
@@ -6386,6 +8592,12 @@ def history():
 @app.route("/release", methods=["POST"])
 @login_required
 def release_lease():
+    """
+    Release the lease.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     context, _, _ = _selected_batch(allow_completed=True)
     if context is None:
         flash("The selected batch is no longer available.", "warning")
@@ -6401,6 +8613,12 @@ def release_lease():
 @app.route("/search", methods=["POST"])
 @login_required
 def search():
+    """
+    Search the loaded records using the submitted search term.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     context, _, _ = _selected_batch()
     if context is None:
         return redirect(url_for("qc"))
@@ -6427,6 +8645,16 @@ def search():
 @app.route("/data_images/<batch>/<path:filepath>")
 @login_required
 def serve_relative_image(batch: str, filepath: str):
+    """
+    Serve a validated image from the selected batch.
+
+    Args:
+        batch (str): Input batch used by the operation.
+        filepath (str): Path to the input file or directory.
+
+    Returns:
+        Response | tuple: Value produced by the operation.
+    """
     batches, _ = discover_batches()
     context = next((item for item in batches if item.id == batch), None)
     if context is None:
@@ -6455,6 +8683,15 @@ API_PIPELINE_FIELDS = {
 
 
 def _api_pipeline_values(payload: Any) -> Tuple[Optional[Dict[str, str]], List[str]]:
+    """
+    Validate and normalize pipeline values supplied by an API request.
+
+    Args:
+        payload (Any): Input payload to validate, transform, or persist.
+
+    Returns:
+        Tuple[Optional[Dict[str, str]], List[str]]: Tuple containing normalized values and validation errors.
+    """
     if not isinstance(payload, dict):
         return None, ["The request body must be a JSON object."]
     errors = []
@@ -6502,6 +8739,12 @@ def _api_pipeline_values(payload: Any) -> Tuple[Optional[Dict[str, str]], List[s
 @app.route("/api/v1/pipeline/jobs", methods=["POST"])
 @_require_api_scope("pipeline:run", "submit")
 def api_create_pipeline_job():
+    """
+    Create and reserve a pipeline job through the API.
+
+    Returns:
+        object: Value produced by the operation.
+    """
     if not request.is_json:
         return _api_problem(415, "unsupported_media_type", "JSON required", "Use Content-Type: application/json.")
     idempotency_key = request.headers.get("Idempotency-Key", "")
@@ -6562,6 +8805,15 @@ def api_create_pipeline_job():
 
 
 def _authorized_api_job(job_id: str) -> Tuple[Optional[Dict[str, Any]], Optional[Any]]:
+    """
+    Return an API job only when the caller is authorized to view it.
+
+    Args:
+        job_id (str): Input job id used by the operation.
+
+    Returns:
+        Tuple[Optional[Dict[str, Any]], Optional[Any]]: Authorized job metadata and its owner, or None values when unavailable.
+    """
     record = api_store.get_job(job_id)
     if record is None or (
         record["owner_id"] != str(g.api_user.id) and not g.api_user.is_admin
@@ -6573,6 +8825,15 @@ def _authorized_api_job(job_id: str) -> Tuple[Optional[Dict[str, Any]], Optional
 @app.route("/api/v1/pipeline/jobs/<job_id>", methods=["GET"])
 @_require_api_scope("pipeline:read")
 def api_pipeline_job(job_id: str):
+    """
+    Return metadata for an authorized pipeline job.
+
+    Args:
+        job_id (str): Input job id used by the operation.
+
+    Returns:
+        Response | object: Value produced by the operation.
+    """
     record, error = _authorized_api_job(job_id)
     if error is not None:
         return error
@@ -6582,6 +8843,15 @@ def api_pipeline_job(job_id: str):
 @app.route("/api/v1/pipeline/jobs/<job_id>/output", methods=["GET"])
 @_require_api_scope("pipeline:read")
 def api_pipeline_job_output(job_id: str):
+    """
+    Return bounded output for an authorized pipeline job.
+
+    Args:
+        job_id (str): Input job id used by the operation.
+
+    Returns:
+        Response | object: Value produced by the operation.
+    """
     record, error = _authorized_api_job(job_id)
     if error is not None:
         return error
@@ -6631,6 +8901,12 @@ def api_pipeline_job_output(job_id: str):
 @app.route("/api/v1/openapi.json", methods=["GET"])
 @_require_api_scope("pipeline:read")
 def api_openapi_document():
+    """
+    Return the OpenAPI document for the API.
+
+    Returns:
+        Response | object: Value produced by the operation.
+    """
     contract_path = Path(__file__).resolve().with_name("openapi.json")
     try:
         with contract_path.open("r", encoding="utf-8") as contract_file:
@@ -6653,7 +8929,15 @@ def api_openapi_document():
 # ==============================================================================
 @app.cli.command("validate-security")
 def validate_security_command():
-    """Validate required production credentials without printing their values."""
+    """
+    Validate required production credentials without printing their values.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        click.ClickException: If validation or the underlying resource operation fails.
+    """
     try:
         validate_security_config()
     except SecurityConfigurationError as exc:
@@ -6663,7 +8947,12 @@ def validate_security_command():
 
 @app.cli.group("api-token")
 def api_token_cli():
-    """Manage scoped personal access tokens for the pipeline API."""
+    """
+    Manage scoped personal access tokens for the pipeline API.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
 
 
 @api_token_cli.command("create")
@@ -6679,6 +8968,21 @@ def api_token_cli():
 )
 @click.option("--expires-days", type=click.IntRange(min=1), default=90, show_default=True)
 def create_api_token(user_id: str, label: str, scopes: Tuple[str, ...], expires_days: int):
+    """
+    Create a scoped API token for a user.
+
+    Args:
+        user_id (str): Identifier of the user associated with the operation.
+        label (str): Input label used by the operation.
+        scopes (Tuple[str, ...]): Input scopes used by the operation.
+        expires_days (int): Numeric limit, duration, or count controlling the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        click.ClickException: If validation or the underlying resource operation fails.
+    """
     if user_manager.get(user_id) is None:
         raise click.ClickException(f"Unknown user: {user_id}")
     raw_token, record = api_store.create_token(user_id, label, list(scopes), expires_days)
@@ -6691,6 +8995,15 @@ def create_api_token(user_id: str, label: str, scopes: Tuple[str, ...], expires_
 @api_token_cli.command("list")
 @click.option("--user", "user_id")
 def list_api_tokens(user_id: Optional[str]):
+    """
+    List API tokens belonging to a user.
+
+    Args:
+        user_id (Optional[str]): Identifier of the user associated with the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     records = api_store.list_tokens(user_id)
     if not records:
         click.echo("No API tokens found.")
@@ -6706,6 +9019,18 @@ def list_api_tokens(user_id: Optional[str]):
 @api_token_cli.command("revoke")
 @click.argument("token_id")
 def revoke_api_token(token_id: str):
+    """
+    Revoke an API token.
+
+    Args:
+        token_id (str): Input token id used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        click.ClickException: If validation or the underlying resource operation fails.
+    """
     if not api_store.revoke_token(token_id):
         raise click.ClickException("Active token not found.")
     click.echo(f"Revoked token {token_id}.")
@@ -6715,6 +9040,19 @@ def revoke_api_token(token_id: str):
 @click.argument("token_id")
 @click.option("--expires-days", type=click.IntRange(min=1), default=90, show_default=True)
 def rotate_api_token(token_id: str, expires_days: int):
+    """
+    Rotate an API token and return its replacement.
+
+    Args:
+        token_id (str): Input token id used by the operation.
+        expires_days (int): Numeric limit, duration, or count controlling the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        click.ClickException: If validation or the underlying resource operation fails.
+    """
     record = next((item for item in api_store.list_tokens() if item["token_id"] == token_id), None)
     if record is None or record["revoked_at"]:
         raise click.ClickException("Active token not found.")
@@ -6730,6 +9068,15 @@ def rotate_api_token(token_id: str, expires_days: int):
 @app.cli.command("init-db")
 @with_appcontext
 def init_db_command():
+    """
+    Initialize application persistence and seed required records.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        click.ClickException: If validation or the underlying resource operation fails.
+    """
     try:
         validate_security_config()
     except SecurityConfigurationError as exc:

@@ -33,6 +33,15 @@ headers = []
 
 def parse_original_line(line_str):
     # (Same as before - extracts identifier, label_text, macro_text)
+    """
+    Parse an OriginalLine value into identifier, label text, and macro text.
+
+    Args:
+        line_str (object): Input line str used by the operation.
+
+    Returns:
+        tuple: Tuple containing the extracted identifier, label text, and macro text.
+    """
     identifier = None
     label_text = "N/A"
     macro_text = "N/A"
@@ -51,11 +60,24 @@ def parse_original_line(line_str):
     return identifier, label_text, macro_text
 
 def _is_row_incomplete(row_dict):
-    """Checks the boolean '_is_complete' flag in a row dictionary."""
+    """
+    Checks the boolean '_is_complete' flag in a row dictionary.
+
+    Args:
+        row_dict (object): Input row dict used by the operation.
+
+    Returns:
+        object: Value produced by the operation.
+    """
     return not row_dict.get('_is_complete', False) # Default to False if missing
 
 def get_current_display_list_indices():
-    """Returns a list of original_indices based on the current filter."""
+    """
+    Returns a list of original_indices based on the current filter.
+
+    Returns:
+        list: Collection produced from the supplied input or stored state.
+    """
     filter_active = session.get('show_only_incomplete', False)
     if not data:
         return []
@@ -65,7 +87,15 @@ def get_current_display_list_indices():
         return list(range(len(data))) # All indices
 
 def get_display_info_for_original_index(original_index):
-     """Given an original_index, find its position in the current display list."""
+     """
+     Given an original_index, find its position in the current display list.
+
+     Args:
+         original_index (object): Input original index used by the operation.
+
+     Returns:
+         dict: Display position and total visible-row information, or None.
+     """
      display_indices = get_current_display_list_indices()
      try:
          # Find where original_index appears in the filtered list
@@ -83,6 +113,13 @@ def find_navigation_index(current_original_index, direction):
     Finds the next/previous original_index based on direction and filter.
     direction: 'next', 'prev', 'next_incorrect'
     Returns the target original_index or None if not found.
+
+    Args:
+        current_original_index (object): Input current original index used by the operation.
+        direction (object): Navigation or sorting option controlling the result order.
+
+    Returns:
+        object: The target visible source-row index, or None when unavailable.
     """
     if not data: return None
 
@@ -128,6 +165,12 @@ def load_csv_data(file_path=CSV_FILE_PATH):
     Loads data from CSV into global variables `data` and `headers`.
     Uses print for logging, suitable for startup and request context.
     Returns True on success, False on failure. DOES NOT touch session.
+
+    Args:
+        file_path (object): Path to the input file or directory.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
     """
     global data, headers
     print(f"INFO: Attempting to load CSV data from: {file_path}") # Indicate loading attempt
@@ -191,7 +234,15 @@ def load_csv_data(file_path=CSV_FILE_PATH):
         return False
 
 def save_csv_data(target_path=CSV_FILE_PATH):
-    """Saves in-memory data to the specified path. Returns True on success."""
+    """
+    Saves in-memory data to the specified path. Returns True on success.
+
+    Args:
+        target_path (object): Path to the target.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+    """
     global data, headers
     if not headers:
         flash("Error: Cannot save, headers not loaded.", "error")
@@ -225,7 +276,12 @@ def save_csv_data(target_path=CSV_FILE_PATH):
         return False
 
 def _create_backup():
-    """Creates timestamped backup. Returns True on success."""
+    """
+    Creates timestamped backup. Returns True on success.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+    """
     if not os.path.exists(CSV_FILE_PATH):
         flash("Warning: Original CSV not found, cannot create backup.", "warning")
         return False
@@ -242,7 +298,12 @@ def _create_backup():
         return False
 
 def save_intermediate_backup():
-    """Saves current state to recovery file. Called periodically."""
+    """
+    Saves current state to recovery file. Called periodically.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     global data
     if not data: return # Nothing to save
 
@@ -261,6 +322,9 @@ def ensure_data_loaded():
     """
     Ensures data is loaded before each request (except static/images).
     Checks modification time and reloads if necessary. Handles session setup.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     # Skip for static files and image serving endpoints
     if request.endpoint in ['static', 'serve_image']:
@@ -312,6 +376,12 @@ def ensure_data_loaded():
 
 @app.route('/', methods=['GET'])
 def index():
+    """
+    Render the primary review interface and select the active work item.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     if not data:
         # Loading failed in before_request or initial load
         return render_template('index.html', error_message="Failed to load CSV data. Please check file and logs.", data_loaded=False)
@@ -397,6 +467,12 @@ def index():
 
 @app.route('/update', methods=['POST'])
 def update():
+    """
+    Validate and persist corrections for the selected review item.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     global data
     if not data:
         flash("Error: Data not loaded, cannot update.", "error")
@@ -491,6 +567,12 @@ def update():
 
 @app.route('/jump', methods=['POST'])
 def jump():
+    """
+    Navigate to the requested record in the current display queue.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     if not data: return redirect(url_for('index'))
 
     try:
@@ -524,6 +606,12 @@ def jump():
 
 @app.route('/search', methods=['POST'])
 def search():
+    """
+    Search the loaded records using the submitted search term.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     if not data: return redirect(url_for('index'))
 
     search_term = request.form.get('search_term', '').strip().lower()
@@ -561,6 +649,12 @@ def search():
 @app.route('/save', methods=['POST'])
 def save():
     # 1. Create Primary Backup
+    """
+    Persist the manager's current in-memory state.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     if not _create_backup():
         flash("Save cancelled because backup failed.", "error")
     else:
@@ -580,6 +674,16 @@ def save():
 # --- Image Serving & Flash Helper (Unchanged) ---
 @app.route('/images/<subdir>/<path:filename>')
 def serve_image(subdir, filename):
+    """
+    Serve a validated image from the configured image directory.
+
+    Args:
+        subdir (object): Input subdir used by the operation.
+        filename (object): Input filename or path for the file.
+
+    Returns:
+        Response | tuple: Value produced by the operation.
+    """
     if subdir not in ['label', 'macro']: return "Invalid image category", 404
     image_dir = os.path.join(IMAGE_BASE_DIR, subdir)
     if not os.path.isdir(IMAGE_BASE_DIR): return "Image directory not found.", 404
@@ -589,6 +693,12 @@ def serve_image(subdir, filename):
         return "Image file not found.", 404
 
 def flash_messages():
+    """
+    Return flashed messages in the structure expected by the templates.
+
+    Returns:
+        object: Value produced by the operation.
+    """
     messages = []
     flashed = get_flashed_messages(with_categories=True)
     if flashed:

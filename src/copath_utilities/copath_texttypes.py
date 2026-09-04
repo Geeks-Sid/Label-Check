@@ -50,10 +50,28 @@ TEXT_TYPES = [
 
 
 def sql_literal(value):
+    """
+    Quote a value as a SQL string literal.
+
+    Args:
+        value (object): Input value to validate, transform, or persist.
+
+    Returns:
+        str: SQL-quoted string literal.
+    """
     return "'" + value.replace("'", "''") + "'"
 
 
 def format_text_agg_columns(indent="        "):
+    """
+    Format the configured CoPath text fields as SQL aggregate expressions.
+
+    Args:
+        indent (object): Input indent used by the operation.
+
+    Returns:
+        str: SQL aggregate expressions for the configured text fields.
+    """
     lines = []
     last_index = len(TEXT_TYPES) - 1
     for index, (texttype_id, column_name) in enumerate(TEXT_TYPES):
@@ -66,10 +84,29 @@ def format_text_agg_columns(indent="        "):
 
 
 def format_texttype_id_list(indent="        "):
+    """
+    Format configured CoPath text-type IDs as a SQL list.
+
+    Args:
+        indent (object): Input indent used by the operation.
+
+    Returns:
+        str: SQL list of configured text-type IDs.
+    """
     return ",\n".join(f"{indent}{sql_literal(texttype_id)}" for texttype_id, _ in TEXT_TYPES)
 
 
 def format_text_select_columns(table_alias, indent="    "):
+    """
+    Format configured CoPath text columns for a SQL SELECT clause.
+
+    Args:
+        table_alias (object): Input table alias used by the operation.
+        indent (object): Input indent used by the operation.
+
+    Returns:
+        str: SQL SELECT fragment for the configured text fields.
+    """
     return ",\n".join(
         f"{indent}{table_alias}.{column_name}"
         for _, column_name in TEXT_TYPES
@@ -77,11 +114,29 @@ def format_text_select_columns(table_alias, indent="    "):
 
 
 def text_field_references(table_alias):
+    """
+    Return qualified references to all configured CoPath text fields.
+
+    Args:
+        table_alias (object): Input table alias used by the operation.
+
+    Returns:
+        list: List of qualified CoPath text-column references.
+    """
     return [f"{table_alias}.{column_name}" for _, column_name in TEXT_TYPES]
 
 
 def compile_report_fields(row, field_names):
-    """Combine report fields into labeled sections, retaining empty fields."""
+    """
+    Combine report fields into labeled sections, retaining empty fields.
+
+    Args:
+        row (object): One data row to process.
+        field_names (object): Field or column metadata used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     sections = []
     for field_name in field_names:
         value = row[field_name]

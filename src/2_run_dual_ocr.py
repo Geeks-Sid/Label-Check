@@ -234,6 +234,9 @@ def add_ocr_to_mapping(
         output_csv (Path): Path where the enriched output CSV will be saved.
         use_cpu (bool): If True, forces EasyOCR to use the CPU. Otherwise, it will try to use a GPU.
         num_workers (int): The number of concurrent threads to use for OCR processing.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     if not mapping_csv.exists():
         logger.error(f"Input mapping CSV not found: {mapping_csv}")

@@ -73,7 +73,15 @@ def clean_and_resolve_path(path_str: str) -> Path | None:
 
 
 def preprocess_image_for_ocr(image_np: np.ndarray) -> np.ndarray:
-    """Convert to grayscale and apply Otsu's binarization to improve OCR accuracy."""
+    """
+    Convert to grayscale and apply Otsu's binarization to improve OCR accuracy.
+
+    Args:
+        image_np (np.ndarray): Input image np used by the operation.
+
+    Returns:
+        np.ndarray: Value produced by the operation.
+    """
     gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
     _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return binary
@@ -83,6 +91,13 @@ def ocr_all_rotations(image_np: np.ndarray, lang: str) -> str:
     """
     Run Tesseract OCR at 0°, 90°, 180°, and 270° rotations and return all
     extracted text concatenated, mirroring EasyOCR's rotation_info behaviour.
+
+    Args:
+        image_np (np.ndarray): Input image np used by the operation.
+        lang (str): Input lang used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
     """
     rotations = [
         cv2.ROTATE_90_CLOCKWISE,
@@ -244,6 +259,9 @@ def add_ocr_to_mapping(
         output_csv: Path where the enriched output CSV will be saved.
         num_workers: The number of concurrent threads to use for OCR processing.
         langs: Language string for OCR (e.g. 'eng').
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     if not mapping_csv.exists():
         logger.error(f"Input mapping CSV not found: {mapping_csv}")

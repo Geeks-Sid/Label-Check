@@ -262,6 +262,9 @@ def add_ocr_to_mapping(
         mapping_csv: Path to the input CSV file.
         output_csv: Path where the enriched output CSV will be saved.
         num_workers: The number of concurrent threads to use for OCR processing.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     if not mapping_csv.exists():
         logger.error(f"Input mapping CSV not found: {mapping_csv}")

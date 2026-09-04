@@ -35,10 +35,28 @@ class PID:
     prev = {}
 
     def __init__(self, instance):
+        """
+        Initialize the PID instance.
+
+        Args:
+            instance (object): Input instance used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.instance = instance
 
 
 def assign_pid(x: str) -> str:
+    """
+    Assign a PID value to the supplied record context.
+
+    Args:
+        x (str): Input x used by the operation.
+
+    Returns:
+        str: Assigned PID string.
+    """
     pid = PID.pid
 
     if x not in PID.prev:
@@ -62,6 +80,15 @@ def assign_pid(x: str) -> str:
 
 
 def clean_acc_date(acc_date: str) -> str:
+    """
+    Normalize an accession date to the expected filename value.
+
+    Args:
+        acc_date (str): Input acc date used by the operation.
+
+    Returns:
+        str: Normalized accession-date string.
+    """
     try:
         parsed = datetime.date.strptime(acc_date, "%Y-%m-%d %H:%M:%S.%f")
     except ValueError as ve:
@@ -72,6 +99,15 @@ def clean_acc_date(acc_date: str) -> str:
 
 
 def identify_samp_acq(samp_acq: str) -> str:
+    """
+    Identify the sample acquisition category from its value.
+
+    Args:
+        samp_acq (str): Input samp acq used by the operation.
+
+    Returns:
+        str: Normalized sample-acquisition category.
+    """
     resection_match = re.search(r"resection", samp_acq, flags=re.IGNORECASE)
     if resection_match:
         return "RE"

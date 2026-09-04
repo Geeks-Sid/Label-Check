@@ -66,7 +66,15 @@ class Config:
 # 2. LOGGING SETUP
 # ==============================================================================
 def setup_logging(app: Flask) -> None:
-    """Configures comprehensive logging for the application."""
+    """
+    Configures comprehensive logging for the application.
+
+    Args:
+        app (Flask): Input app used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     if not os.path.exists("logs"):
         os.mkdir("logs")
 
@@ -145,14 +153,36 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
 
     def set_password(self, password: str) -> None:
-        """Hashes and sets the user's password."""
+        """
+        Hashes and sets the user's password.
+
+        Args:
+            password (str): Input password used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.password_hash = generate_password_hash(password)
 
     def verify_password(self, password: str) -> bool:
-        """Verifies a given password against the stored hash."""
+        """
+        Verifies a given password against the stored hash.
+
+        Args:
+            password (str): Input password used by the operation.
+
+        Returns:
+            bool: Whether the requested condition or validation succeeds.
+        """
         return check_password_hash(self.password_hash, password)
 
     def __repr__(self) -> str:
+        """
+        Return a concise developer-facing representation of the User.
+
+        Returns:
+            str: String representation or formatted value produced by the operation.
+        """
         return f"<User {self.id}>"
 
 
@@ -183,12 +213,26 @@ class QueueItem(db.Model):
     )
 
     def __repr__(self) -> str:
+        """
+        Return a concise developer-facing representation of the QueueItem.
+
+        Returns:
+            str: String representation or formatted value produced by the operation.
+        """
         return f"<QueueItem {self.original_index} - {self.status}>"
 
 
 @login_manager.user_loader
 def load_user(user_id: str) -> Optional[User]:
-    """Loads a user from the database by their ID for Flask-Login."""
+    """
+    Loads a user from the database by their ID for Flask-Login.
+
+    Args:
+        user_id (str): Identifier of the user associated with the operation.
+
+    Returns:
+        Optional[User]: Value produced by the operation.
+    """
     return User.query.get(user_id)
 
 
@@ -208,7 +252,12 @@ headers: List[str] = []
 # 7. HELPER FUNCTIONS (Data Processing & Navigation)
 # ==============================================================================
 def _release_expired_leases():
-    """Scans for and releases any leases that have expired."""
+    """
+    Scans for and releases any leases that have expired.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     lease_duration = datetime.timedelta(seconds=app.config["LEASE_DURATION_SECONDS"])
     expired_time = datetime.datetime.utcnow() - lease_duration
 
@@ -232,7 +281,12 @@ def _release_expired_leases():
 
 
 def _recalculate_accession_counts() -> None:
-    """Recalculates and updates the count for each AccessionID in the global data."""
+    """
+    Recalculates and updates the count for each AccessionID in the global data.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     global data
     if not data:
         return
@@ -248,7 +302,15 @@ def _recalculate_accession_counts() -> None:
 
 
 def parse_original_line(line_str: str) -> Tuple[Optional[str], str, str]:
-    """Parses the 'OriginalLine' string to extract identifier, label, and macro text."""
+    """
+    Parses the 'OriginalLine' string to extract identifier, label, and macro text.
+
+    Args:
+        line_str (str): Input line str used by the operation.
+
+    Returns:
+        Tuple[Optional[str], str, str]: Tuple containing the extracted identifier, label text, and macro text.
+    """
     identifier: Optional[str] = None
     label_text, macro_text = "N/A", "N/A"
 
@@ -268,12 +330,25 @@ def parse_original_line(line_str: str) -> Tuple[Optional[str], str, str]:
 
 
 def _is_row_incomplete(row_dict: Dict[str, Any]) -> bool:
-    """Checks if a row is marked as incomplete."""
+    """
+    Checks if a row is marked as incomplete.
+
+    Args:
+        row_dict (Dict[str, Any]): Input row dict used by the operation.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+    """
     return not row_dict.get("_is_complete", False)
 
 
 def get_current_display_list_indices() -> List[int]:
-    """Returns a list of original data indices based on the current filter."""
+    """
+    Returns a list of original data indices based on the current filter.
+
+    Returns:
+        List[int]: Collection produced from the supplied input or stored state.
+    """
     if not data:
         return []
     if session.get("show_only_incomplete"):
@@ -284,7 +359,15 @@ def get_current_display_list_indices() -> List[int]:
 def get_display_info_for_original_index(
     original_index: int,
 ) -> Optional[Dict[str, int]]:
-    """Gets the display index and count for a given original data index."""
+    """
+    Gets the display index and count for a given original data index.
+
+    Args:
+        original_index (int): Input original index used by the operation.
+
+    Returns:
+        Optional[Dict[str, int]]: Display position and total visible-row information, or None.
+    """
     display_indices = get_current_display_list_indices()
     try:
         return {
@@ -299,7 +382,16 @@ def get_display_info_for_original_index(
 
 
 def find_navigation_index(current_original_index: int, direction: str) -> Optional[int]:
-    """Finds the next/previous original index based on the navigation direction and filter."""
+    """
+    Finds the next/previous original index based on the navigation direction and filter.
+
+    Args:
+        current_original_index (int): Input current original index used by the operation.
+        direction (str): Navigation or sorting option controlling the result order.
+
+    Returns:
+        Optional[int]: The target visible source-row index, or None when unavailable.
+    """
     display_indices = get_current_display_list_indices()
     if not display_indices:
         return None
@@ -342,6 +434,15 @@ def load_csv_data(file_path: str = Config.CSV_FILE_PATH) -> None:
     """
     Loads and processes data from the specified CSV file into the global store.
     Raises DataLoadError on failure.
+
+    Args:
+        file_path (str): Path to the input file or directory.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        DataLoadError: If validation or the underlying resource operation fails.
     """
     global data, headers
     app.logger.info(f"Attempting to load CSV data from: {file_path}")
@@ -405,6 +506,15 @@ def save_csv_data(target_path: str = Config.CSV_FILE_PATH) -> None:
     """
     Saves the current in-memory data to the target CSV file atomically.
     Raises DataSaveError on failure.
+
+    Args:
+        target_path (str): Path to the target.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        DataSaveError: If validation or the underlying resource operation fails.
     """
     global data, headers
     if not headers:
@@ -463,6 +573,12 @@ def _create_backup() -> None:
     """
     Creates a timestamped backup of the main CSV file.
     Raises BackupError on failure.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        BackupError: If validation or the underlying resource operation fails.
     """
     if not os.path.exists(Config.CSV_FILE_PATH):
         raise BackupError("Cannot create backup: Source CSV file does not exist.")
@@ -492,6 +608,9 @@ def _create_backup() -> None:
 def before_request_handler() -> None:
     """
     Runs before each request. Logs the request and ensures data is loaded.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     # Log API hit
     user_id = current_user.id if current_user.is_authenticated else "Anonymous"
@@ -549,7 +668,12 @@ def before_request_handler() -> None:
 # --- Authentication Routes ---
 @app.route("/login", methods=["GET", "POST"])
 def login() -> Union[Response, str]:
-    """Handles user login."""
+    """
+    Handles user login.
+
+    Returns:
+        Union[Response, str]: Value produced by the operation.
+    """
     if current_user.is_authenticated:
         return redirect(url_for("index"))
 
@@ -574,7 +698,12 @@ def login() -> Union[Response, str]:
 @app.route("/logout")
 @login_required
 def logout() -> Response:
-    """Logs out the current user."""
+    """
+    Logs out the current user.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     app.logger.info(f"User '{current_user.id}' logged out.")
     logout_user()
     flash("You have been logged out.", "info")
@@ -585,7 +714,12 @@ def logout() -> Response:
 @app.route("/users")
 @login_required
 def users_management() -> Union[Response, str]:
-    """Displays user management page (admin only)."""
+    """
+    Displays user management page (admin only).
+
+    Returns:
+        Union[Response, str]: Value produced by the operation.
+    """
     if not current_user.is_admin:
         app.logger.warning(
             f"User '{current_user.id}' attempted to access admin page without permission."
@@ -600,7 +734,12 @@ def users_management() -> Union[Response, str]:
 @app.route("/add_user", methods=["POST"])
 @login_required
 def add_user() -> Response:
-    """Handles adding a new user (admin only)."""
+    """
+    Handles adding a new user (admin only).
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     if not current_user.is_admin:
         app.logger.warning(
             f"User '{current_user.id}' attempted to add a user without permission."
@@ -639,7 +778,12 @@ def add_user() -> Response:
 @app.route("/", methods=["GET"])
 @login_required
 def index() -> str:
-    """Displays the main data correction interface, managing the item queue."""
+    """
+    Displays the main data correction interface, managing the item queue.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     if not data:
         return render_template(
             "index.html",
@@ -837,7 +981,16 @@ def index() -> str:
 
 
 def _apply_row_updates(row: Dict[str, Any], form: Request.form) -> Tuple[bool, bool]:
-    """Applies form data to a data row and returns change status."""
+    """
+    Applies form data to a data row and returns change status.
+
+    Args:
+        row (Dict[str, Any]): One data row to process.
+        form (Request.form): Input form used by the operation.
+
+    Returns:
+        Tuple[bool, bool]: Collection produced from the supplied input or stored state.
+    """
     data_changed, accession_id_changed = False, False
 
     submitted_accession_id = form.get("accession_id", "").strip()
@@ -873,7 +1026,15 @@ def _apply_row_updates(row: Dict[str, Any], form: Request.form) -> Tuple[bool, b
 @app.route("/update", methods=["POST"])
 @login_required
 def update() -> Response:
-    """Handles form submission for updating a data row, respecting the leasing system."""
+    """
+    Handles form submission for updating a data row, respecting the leasing system.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+
+    Raises:
+        IndexError: If validation or the underlying resource operation fails.
+    """
     if not data:
         return redirect(url_for("index"))
 
@@ -957,7 +1118,12 @@ def update() -> Response:
 @app.route("/release_lease", methods=["POST"])
 @login_required
 def release_lease() -> Response:
-    """Releases the current user's active lease."""
+    """
+    Releases the current user's active lease.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     active_lease = QueueItem.query.filter_by(
         leased_by_id=current_user.id, status="leased"
     ).first()
@@ -981,7 +1147,12 @@ def release_lease() -> Response:
 @app.route("/history")
 @login_required
 def history() -> str:
-    """Displays the user's annotation history."""
+    """
+    Displays the user's annotation history.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     completed_items = (
         QueueItem.query.filter_by(completed_by_id=current_user.id)
         .order_by(QueueItem.completed_at.desc())
@@ -1000,7 +1171,12 @@ def history() -> str:
 @app.route("/jump", methods=["POST"])
 @login_required
 def jump() -> Response:
-    """Handles jumping to a specific item in the display queue."""
+    """
+    Handles jumping to a specific item in the display queue.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     if not data:
         return redirect(url_for("index"))
     current_index = request.form.get("original_index", 0)
@@ -1033,7 +1209,12 @@ def jump() -> Response:
 @app.route("/search", methods=["POST"])
 @login_required
 def search() -> Response:
-    """Handles searching for a specific Accession ID or Patient Identifier."""
+    """
+    Handles searching for a specific Accession ID or Patient Identifier.
+
+    Returns:
+        Response: HTTP response or rendered page for the request.
+    """
     if not data:
         return redirect(url_for("index"))
     current_index = request.form.get("original_index", 0)
@@ -1064,7 +1245,16 @@ def search() -> Response:
 
 @app.route("/images/<subdir>/<path:filename>")
 def serve_image(subdir: str, filename: str) -> Union[Response, Tuple[str, int]]:
-    """Serves image files securely from the configured image directory."""
+    """
+    Serves image files securely from the configured image directory.
+
+    Args:
+        subdir (str): Input subdir used by the operation.
+        filename (str): Input filename or path for the file.
+
+    Returns:
+        Union[Response, Tuple[str, int]]: Value produced by the operation.
+    """
     if subdir not in ["label", "macro", "thumbnail"]:
         app.logger.warning(f"Invalid image subdirectory requested: {subdir}")
         return "Invalid image category", 404
@@ -1082,7 +1272,12 @@ def serve_image(subdir: str, filename: str) -> Union[Response, Tuple[str, int]]:
 
 
 def flash_messages() -> List[Dict[str, str]]:
-    """Helper to format flashed messages for templates."""
+    """
+    Helper to format flashed messages for templates.
+
+    Returns:
+        List[Dict[str, str]]: Collection produced from the supplied input or stored state.
+    """
     messages = []
     for category, message in get_flashed_messages(with_categories=True):
         css_class = "flash-critical" if category == "critical" else category
@@ -1098,7 +1293,12 @@ def flash_messages() -> List[Dict[str, str]]:
 @app.cli.command("init-db")
 @with_appcontext
 def init_db_command():
-    """Initializes the database, creates the default admin user, and populates the queue."""
+    """
+    Initializes the database, creates the default admin user, and populates the queue.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     db.create_all()
     print("INFO: Database tables created.")
 

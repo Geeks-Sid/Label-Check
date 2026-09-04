@@ -29,14 +29,42 @@ class QueueProtocolError(RuntimeError):
 
 
 def utc_now() -> dt.datetime:
+    """
+    Return the current timezone-aware UTC datetime.
+
+    Returns:
+        dt.datetime: Current timezone-aware UTC datetime.
+    """
     return dt.datetime.now(dt.timezone.utc)
 
 
 def format_utc(value: dt.datetime) -> str:
+    """
+    Format a datetime as a normalized UTC timestamp.
+
+    Args:
+        value (dt.datetime): Input value to validate, transform, or persist.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     return value.astimezone(dt.timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def parse_utc(value: object, field: str) -> dt.datetime:
+    """
+    Parse and normalize a UTC timestamp from queue data.
+
+    Args:
+        value (object): Input value to validate, transform, or persist.
+        field (str): Field or column metadata used by the operation.
+
+    Returns:
+        dt.datetime: Timezone-aware UTC datetime.
+
+    Raises:
+        QueueProtocolError: If validation or the underlying resource operation fails.
+    """
     if not isinstance(value, str):
         raise QueueProtocolError(f"{field} must be a UTC timestamp")
     try:
@@ -49,12 +77,36 @@ def parse_utc(value: object, field: str) -> dt.datetime:
 
 
 def validate_request_id(value: object) -> str:
+    """
+    Validate a queue request identifier.
+
+    Args:
+        value (object): Input value to validate, transform, or persist.
+
+    Returns:
+        str: Validated request ID string.
+
+    Raises:
+        QueueProtocolError: If validation or the underlying resource operation fails.
+    """
     if not isinstance(value, str) or not REQUEST_ID_PATTERN.fullmatch(value):
         raise QueueProtocolError("request_id is invalid")
     return value
 
 
 def validate_accessions(values: object) -> List[str]:
+    """
+    Validate, normalize, and de-duplicate requested accessions.
+
+    Args:
+        values (object): Input values to validate, transform, or persist.
+
+    Returns:
+        List[str]: Normalized unique accession strings.
+
+    Raises:
+        QueueProtocolError: If validation or the underlying resource operation fails.
+    """
     if not isinstance(values, list) or not values:
         raise QueueProtocolError("accessions must be a non-empty list")
     if len(values) > MAX_ACCESSIONS:
@@ -74,11 +126,32 @@ def validate_accessions(values: object) -> List[str]:
 
 
 def queue_paths(root: Path) -> Dict[str, Path]:
+    """
+    Return paths for each directory in the shared queue.
+
+    Args:
+        root (Path): Directory used as the root.
+
+    Returns:
+        Dict[str, Path]: Mapping from queue directory names to paths.
+    """
     root = Path(root)
     return {name: root / name for name in QUEUE_DIRECTORIES}
 
 
 def initialize_queue(root: Path) -> Dict[str, Path]:
+    """
+    Create and secure all directories in the shared queue.
+
+    Args:
+        root (Path): Directory used as the root.
+
+    Returns:
+        Dict[str, Path]: Mapping from queue directory names to initialized paths.
+
+    Raises:
+        QueueProtocolError: If validation or the underlying resource operation fails.
+    """
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
     if root.is_symlink() or not root.is_dir():
@@ -94,6 +167,16 @@ def initialize_queue(root: Path) -> Dict[str, Path]:
 
 
 def atomic_write_json(path: Path, payload: Dict[str, object]) -> None:
+    """
+    Write JSON content through a temporary file and atomic replace.
+
+    Args:
+        path (Path): Path to the input file or directory.
+        payload (Dict[str, object]): Input payload to validate, transform, or persist.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     try:
@@ -108,6 +191,18 @@ def atomic_write_json(path: Path, payload: Dict[str, object]) -> None:
 
 
 def read_json(path: Path) -> Dict[str, object]:
+    """
+    Read and validate a JSON queue artifact.
+
+    Args:
+        path (Path): Path to the input file or directory.
+
+    Returns:
+        Dict[str, object]: Decoded JSON object from the queue artifact.
+
+    Raises:
+        QueueProtocolError: If validation or the underlying resource operation fails.
+    """
     if path.is_symlink() or not path.is_file():
         raise QueueProtocolError(f"{path.name} is not a regular file")
     try:
@@ -124,6 +219,19 @@ def read_json(path: Path) -> Dict[str, object]:
 
 
 def validate_request(payload: Dict[str, object], expected_id: Optional[str] = None) -> Tuple[str, dt.datetime, List[str], str]:
+    """
+    Validate a queue request payload and return its normalized fields.
+
+    Args:
+        payload (Dict[str, object]): Input payload to validate, transform, or persist.
+        expected_id (Optional[str]): Input expected id used by the operation.
+
+    Returns:
+        Tuple[str, dt.datetime, List[str], str]: Tuple containing the request ID, expiry time, accession list, and scope.
+
+    Raises:
+        QueueProtocolError: If validation or the underlying resource operation fails.
+    """
     version = payload.get("version")
     if version not in (1, PROTOCOL_VERSION):
         raise QueueProtocolError("unsupported queue protocol version")
@@ -139,6 +247,19 @@ def validate_request(payload: Dict[str, object], expected_id: Optional[str] = No
 
 
 def require_fresh_heartbeat(root: Path, now: Optional[dt.datetime] = None) -> Dict[str, object]:
+    """
+    Require a recent Windows worker heartbeat and return its payload.
+
+    Args:
+        root (Path): Directory used as the root.
+        now (Optional[dt.datetime]): Reference time or date used for the operation.
+
+    Returns:
+        Dict[str, object]: Worker heartbeat payload when the worker is available and current.
+
+    Raises:
+        QueueProtocolError: If validation or the underlying resource operation fails.
+    """
     heartbeat_path = Path(root) / "worker.json"
     try:
         payload = read_json(heartbeat_path)
@@ -161,6 +282,20 @@ def require_fresh_heartbeat(root: Path, now: Optional[dt.datetime] = None) -> Di
 def validate_result_csv(
     path: Path, requested: Iterable[str], scope: str = "exact_accession"
 ) -> Tuple[List[str], List[Dict[str, str]]]:
+    """
+    Validate a worker result CSV and return its identifiers and rows.
+
+    Args:
+        path (Path): Path to the input file or directory.
+        requested (Iterable[str]): Input requested used by the operation.
+        scope (str): Requested query or API scope.
+
+    Returns:
+        Tuple[List[str], List[Dict[str, str]]]: Tuple containing returned identifiers and validated result rows.
+
+    Raises:
+        QueueProtocolError: If validation or the underlying resource operation fails.
+    """
     if path.is_symlink() or not path.is_file():
         raise QueueProtocolError("The Windows CoPath worker returned an unsafe result file")
     try:
@@ -196,6 +331,19 @@ def validate_result_csv(
 
 
 def _validate_error(path: Path, request_id: str) -> str:
+    """
+    Validate a worker error artifact and return its safe message.
+
+    Args:
+        path (Path): Path to the input file or directory.
+        request_id (str): Input request id used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+
+    Raises:
+        QueueProtocolError: If validation or the underlying resource operation fails.
+    """
     payload = read_json(path)
     if payload.get("version") != PROTOCOL_VERSION:
         raise QueueProtocolError("The Windows CoPath worker returned a malformed error")
@@ -216,6 +364,16 @@ def _validate_error(path: Path, request_id: str) -> str:
 
 
 def _cleanup_job(paths: Dict[str, Path], request_id: str) -> None:
+    """
+    Remove terminal queue artifacts for a completed request.
+
+    Args:
+        paths (Dict[str, Path]): Input paths used by the operation.
+        request_id (str): Input request id used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     for directory, suffix in (
         ("requests", ".json"), ("processing", ".json"),
         ("results", ".csv"), ("errors", ".json"),
@@ -233,7 +391,24 @@ def submit_query(
     monotonic: Callable[[], float] = time.monotonic,
     scope: str = "exact_accession",
 ) -> None:
-    """Publish one request and atomically consume its matching terminal artifact."""
+    """
+    Publish one request and atomically consume its matching terminal artifact.
+
+    Args:
+        root (Path): Directory used as the root.
+        accessions (Sequence[str]): Identifier values to process.
+        output_path (Path): Path to the output.
+        timeout_seconds (float): Numeric limit, duration, or count controlling the operation.
+        poll_interval (float): Input poll interval used by the operation.
+        monotonic (Callable[[], float]): Input monotonic used by the operation.
+        scope (str): Requested query or API scope.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        QueueProtocolError: If validation or the underlying resource operation fails.
+    """
     normalized = validate_accessions(list(accessions))
     if scope not in QUERY_SCOPES:
         raise QueueProtocolError("query scope is invalid")

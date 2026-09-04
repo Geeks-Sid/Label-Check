@@ -93,13 +93,16 @@ class TiffFile(object):
     def __init__(self, path):
         """
         Initialize a TiffFile object by opening and parsing the TIFF header.
-        
+
         Args:
             path (str): Path to the TIFF file to open
             
         Raises:
             UnrecognizedFile: If the file is not a valid TIFF file
             IOError: If the file cannot be opened or has no directories
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         self.fh = open(path, 'r+b')
 
@@ -251,34 +254,94 @@ class TiffFile(object):
     def write_fmt(self, fmt, *args):
         """
         Pack and write binary data using a format string.
-        
+
         Args:
             fmt (str): Format string for struct.pack
             *args: Values to pack and write
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         fmt = self._convert_format(fmt)
         data = struct.pack(fmt, *args)
         self.fh.write(data)
 
     def tell(self):
+        """
+        Return the current byte offset in the TIFF file.
+
+        Returns:
+            object: Current TIFF file offset.
+        """
         return self.fh.tell()
 
     def seek(self, offset, whence=os.SEEK_SET):
+        """
+        Move the TIFF file cursor to a byte offset.
+
+        Args:
+            offset (object): Input offset used by the operation.
+            whence (object): Input whence used by the operation.
+
+        Returns:
+            None: None; the file cursor is moved as a side effect.
+        """
         self.fh.seek(offset, whence)
 
     def read(self, size=-1):
+        """
+        Read bytes from the TIFF file.
+
+        Args:
+            size (object): Input size used by the operation.
+
+        Returns:
+            bytes: Bytes read from the TIFF file.
+        """
         return self.fh.read(size)
 
     def write(self, data):
+        """
+        Write bytes to the TIFF file.
+
+        Args:
+            data (object): Input data to validate, transform, or persist.
+
+        Returns:
+            None: None; bytes are written as a side effect.
+        """
         self.fh.write(data)
 
     def close(self):
+        """
+        Close the TIFF file handle.
+
+        Returns:
+            None: None; the TIFF file handle is closed as a side effect.
+        """
         self.fh.close()
 
     def __enter__(self):
+        """
+        Enter the TIFF file context and return the file object.
+
+        Returns:
+            TiffFile: The open TIFF file object.
+        """
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Exit the TIFF file context and close the file object.
+
+        Args:
+            exc_type (object): Exception information supplied by the runtime.
+            exc_value (object): Exception information supplied by the runtime.
+            traceback (object): Exception information supplied by the runtime.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self.close()
 
 
@@ -301,11 +364,14 @@ class TiffDirectory(object):
     def __init__(self, tiff_file, number, in_pointer_offset):
         """
         Initialize a TiffDirectory by reading entries from the file.
-        
+
         Args:
             tiff_file (TiffFile): Parent TiffFile object
             number (int): Sequential directory number
             in_pointer_offset (int): File offset where pointer to this directory is stored
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         self.entries = {}
         fh = tiff_file
@@ -323,17 +389,20 @@ class TiffDirectory(object):
     def delete(self, expected_prefix=None):
         """
         Delete this directory by zeroing its image data and removing it from the chain.
-        
+
         This method is used for anonymization - it wipes the image data associated
         with this directory (typically the label/macro image) and then removes the
         directory from the TIFF directory chain.
-        
+
         Args:
             expected_prefix (bytes, optional): Expected data prefix to verify before deletion.
                 Used as a safety check to ensure we're deleting the right data.
                 
         Raises:
             IOError: If directory is not stripped, or if expected_prefix doesn't match
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         # Get strip offsets/lengths - these tell us where the image data is stored
         try:
@@ -387,9 +456,12 @@ class TiffEntry(object):
     def __init__(self, fh):
         """
         Initialize a TiffEntry by reading from the file.
-        
+
         Args:
             fh (TiffFile): Parent TiffFile object
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         self.start = fh.tell()
         # Read entry structure: tag (H), type (H), count (Z), value/offset (Z)
@@ -473,12 +545,15 @@ class MrxsFile(object):
     def __init__(self, filename):
         """
         Initialize an MrxsFile object by parsing the MRXS directory structure.
-        
+
         Args:
             filename (str): Path to the .mrxs file (directory)
             
         Raises:
             UnrecognizedFile: If file is not a valid MRXS format
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         # MRXS files are actually directories, so we need the directory path
         dirname, ext = os.path.splitext(filename)
@@ -515,9 +590,12 @@ class MrxsFile(object):
     def _make_levels(self):
         """
         Build the levels structure from the MRXS configuration.
-        
+
         MRXS files organize image data into layers and levels. This method
         parses the configuration to build a complete map of all levels.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         self._levels = {}
         self._level_list = []
@@ -558,15 +636,18 @@ class MrxsFile(object):
     def _assert_int32(cls, f, value):
         """
         Read a 32-bit integer and assert it matches an expected value.
-        
+
         Used for validating file structure during parsing.
-        
+
         Args:
             f: File handle
             value (int): Expected integer value
             
         Raises:
             ValueError: If read value doesn't match expected value
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         v = cls._read_int32(f)
         if v != value:
@@ -618,16 +699,19 @@ class MrxsFile(object):
     def _zero_record(self, record):
         """
         Zero out the image data for a specific record.
-        
+
         If the data is at the end of the file, truncate it. Otherwise,
         overwrite it with zeros. Includes a safety check to verify we're
         deleting JPEG data.
-        
+
         Args:
             record (int): Record number to zero out
             
         Raises:
             IOError: If data doesn't match expected JPEG header
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         path, offset, length = self._get_data_location(record)
         with open(path, 'r+b') as fh:
@@ -656,12 +740,18 @@ class MrxsFile(object):
     def _delete_index_record(self, record):
         """
         Remove a record from the index file by shifting subsequent records.
-        
+
         This effectively removes the pointer to the deleted level's data
         from the index table.
-        
+
         Args:
             record (int): Record number to delete
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            IOError: If validation or the underlying resource operation fails.
         """
         if DEBUG:
             print('Deleting record', record)
@@ -703,10 +793,13 @@ class MrxsFile(object):
     def _rename_section(self, old, new):
         """
         Rename a section in the configuration file.
-        
+
         Args:
             old (str): Current section name
             new (str): New section name
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         if self._dat.has_section(old):
             if DEBUG:
@@ -722,9 +815,12 @@ class MrxsFile(object):
     def _delete_section(self, section):
         """
         Delete a section from the configuration file.
-        
+
         Args:
             section (str): Section name to delete
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         if DEBUG:
             print('Deleting [%s]' % section)
@@ -733,11 +829,14 @@ class MrxsFile(object):
     def _set_key(self, section, key, value):
         """
         Set a key-value pair in a configuration section.
-        
+
         Args:
             section (str): Section name
             key (str): Key name
             value (str): Value to set
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         if DEBUG:
             prev = self._dat.get(section, key)
@@ -747,11 +846,14 @@ class MrxsFile(object):
     def _rename_key(self, section, old, new):
         """
         Rename a key within a configuration section.
-        
+
         Args:
             section (str): Section name
             old (str): Current key name
             new (str): New key name
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         if DEBUG:
             print('[%s] %s -> %s' % (section, old, new))
@@ -763,10 +865,13 @@ class MrxsFile(object):
     def _delete_key(self, section, key):
         """
         Delete a key from a configuration section.
-        
+
         Args:
             section (str): Section name
             key (str): Key name to delete
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         if DEBUG:
             print('Deleting [%s] %s' % (section, key))
@@ -775,9 +880,12 @@ class MrxsFile(object):
     def _write(self):
         """
         Write the configuration back to the Slidedat.ini file.
-        
-        Preserves the original BOM (if present) and uses Windows line endings (\r\n)
+
+        Preserves the original BOM (if present) and uses Windows line endings (\\r\\n)
         as expected by MRXS format.
+
+        Returns:
+            None: None; bytes are written as a side effect.
         """
         buf = StringIO()
         self._dat.write(buf)
@@ -791,20 +899,23 @@ class MrxsFile(object):
     def delete_level(self, layer_name, level_name):
         """
         Delete a specific level from the MRXS file (used for anonymization).
-        
+
         This is a complex operation that:
         1. Zeros out the image data
         2. Removes the index record
         3. Removes configuration keys and sections
         4. Renumbers subsequent levels in the same layer
         5. Updates the level count
-        
+
         Args:
             layer_name (str): Name of the layer (e.g., 'Scan data layer')
             level_name (str): Name of the level to delete (e.g., 'ScanDataLayer_SlideBarcode')
             
         Raises:
             KeyError: If the specified level doesn't exist
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         level = self._levels[(layer_name, level_name)]
         record = level.record
@@ -875,12 +986,15 @@ class MrxsNonHierLevel(object):
     def __init__(self, dat, layer_id, level_id, record):
         """
         Initialize a MrxsNonHierLevel from configuration data.
-        
+
         Args:
             dat (RawConfigParser): Parsed Slidedat.ini configuration
             layer_id (int): Numeric ID of the layer
             level_id (int): Numeric ID of the level
             record (int): Sequential record number
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
         """
         self.layer_id = layer_id
         self.id = level_id
@@ -900,13 +1014,16 @@ class MrxsNonHierLevel(object):
 def accept(filename, format):
     """
     Accept callback function called when a file format is recognized.
-    
+
     Currently only used for debug output. Can be extended for logging or
     other purposes.
-    
+
     Args:
         filename (str): Path to the file being processed
         format (str): Format name ('SVS', 'NDPI', or 'MRXS')
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     if DEBUG:
         print(filename + ':', format)
@@ -922,6 +1039,9 @@ def _export_removed_svs_images(filename, archive_root):
 
     Raises:
         IOError: If an output file already exists or an image cannot be saved
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     archive_root = Path(archive_root)
     slide_name = Path(filename).stem
@@ -960,6 +1080,9 @@ def do_aperio_svs(filename, archive_root=None):
     Raises:
         UnrecognizedFile: If file is not an Aperio SVS file
         IOError: If no label directory is found
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     with TiffFile(filename) as fh:
         # Check for SVS file by verifying IMAGE_DESCRIPTION starts with 'Aperio'
@@ -996,17 +1119,20 @@ def do_aperio_svs(filename, archive_root=None):
 def do_hamamatsu_ndpi(filename):
     """
     Anonymize a Hamamatsu NDPI whole-slide image by removing the macro image (label).
-    
+
     Hamamatsu NDPI files are TIFF-based with extensions. The label is stored as
     a "macro image" in a TIFF directory. It's identified by having a SOURCELENS
     tag with value -1. The macro image is JPEG-compressed.
-    
+
     Args:
         filename (str): Path to the NDPI file
         
     Raises:
         UnrecognizedFile: If file is not a Hamamatsu NDPI file
         IOError: If no macro image (label) is found
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     with TiffFile(filename) as fh:
         # Check for NDPI file by looking for NDPI_MAGIC tag in first directory
@@ -1028,16 +1154,19 @@ def do_hamamatsu_ndpi(filename):
 def do_3dhistech_mrxs(filename):
     """
     Anonymize a 3DHistech MRXS whole-slide image by removing the slide barcode.
-    
+
     MRXS files store the label/barcode in a specific level called
     'ScanDataLayer_SlideBarcode' within the 'Scan data layer'.
-    
+
     Args:
         filename (str): Path to the MRXS file
         
     Raises:
         UnrecognizedFile: If file is not a valid MRXS file
         IOError: If the slide barcode level is not found
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     mrxs = MrxsFile(filename)
     try:
@@ -1057,15 +1186,18 @@ format_handlers = [
 def anonymize_slide(filename, archive_root=None):
     """
     Anonymize a whole-slide image file by removing its label.
-    
+
     This function tries each format handler in sequence until one recognizes
     the file format. The handlers are tried in order: SVS, NDPI, MRXS.
-    
+
     Args:
         filename (str): Path to the whole-slide image file
         
     Returns:
         int: Exit code (0 for success, 1 for failure)
+
+    Raises:
+        IOError: If validation or the underlying resource operation fails.
     """
     global DEBUG
     exit_code = 0
@@ -1095,18 +1227,21 @@ def anonymize_slide(filename, archive_root=None):
 def rename_files(slide_folder, mapping_file):
     """
     Rename folders and files with anonymized identifiers and log mappings.
-    
+
     This function renames all subfolders in slide_folder with anonymized names
     starting from 'IUTCAAAAAA' and incrementing. Files within each folder are
     also renamed to match the folder name with '_HNE.svs' suffix. All
     original-to-anonymized mappings are logged to a CSV file.
-    
+
     The naming scheme uses a base-26 (A-Z) counter system:
     - IUTCAAAAAA, IUTCAAAAAB, IUTCAAAAAC, ..., IUTCAAAAAZ, IUTCAAAABA, etc.
-    
+
     Args:
         slide_folder (str): Path to folder containing slide subfolders
         mapping_file (str): Path to CSV file where mappings will be logged
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     # Get the list of subfolders in the slide_folder
     subfolders = [f.path for f in os.scandir(slide_folder) if f.is_dir()]
@@ -1159,16 +1294,19 @@ def rename_files(slide_folder, mapping_file):
 def main():
     """
     Main entry point for the anonymization script.
-    
+
     This function:
     1. Sets up paths for the slide folder and mapping file
     2. Creates/clears the mapping CSV file
     3. Finds all .svs files recursively
     4. Processes each file to remove labels
     5. Logs all results to the CSV file
-    
+
     The script expects a 'slides_to_anonymize' folder in the same directory
     as the script. Results are logged to 'anonymization_results.csv' in that folder.
+
+    Returns:
+        int: Process exit status, where applicable.
     """
 
     parser = argparse.ArgumentParser(

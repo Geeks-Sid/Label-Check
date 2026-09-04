@@ -189,7 +189,15 @@ def build_stain_normalizer(
 
 
 def normalize_accession_id(value: str) -> str:
-    """Normalize a recognized accession ID to the canonical A12-123 form."""
+    """
+    Normalize a recognized accession ID to the canonical A12-123 form.
+
+    Args:
+        value (str): Input value to validate, transform, or persist.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     candidate = (value or "").strip()
     match = LOOSE_ACCESSION_PATTERN.fullmatch(candidate)
     if not match:
@@ -300,6 +308,9 @@ def enrich_csv_with_parsing(
         output_path (Path): Path where the final, enriched CSV will be saved.
         accession_pattern_str (str): The regex pattern string for finding accession IDs.
         num_workers (int): The number of concurrent threads to use for processing.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
     """
     if not input_path.exists():
         logger.error(f"Input file not found: {input_path}")

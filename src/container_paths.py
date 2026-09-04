@@ -14,7 +14,15 @@ MAPPINGS = (
 
 
 def runtime_path(value: str | os.PathLike[str]) -> Path:
-    """Return a mounted Linux path when value begins with a configured host prefix."""
+    """
+    Return a mounted Linux path when value begins with a configured host prefix.
+
+    Args:
+        value (str | os.PathLike[str]): Input value to validate, transform, or persist.
+
+    Returns:
+        Path: Runtime path with any configured host prefix mapped.
+    """
     raw = os.fspath(value)
     if os.name == "nt":
         return Path(raw)

@@ -488,6 +488,15 @@ mrn_query = """
 REPORT_FIELDS = [ tt[1] for tt in TEXT_TYPES ]
 
 def parse_field(field):
+    """
+    Parse a report field that may contain encoded text or a missing value.
+
+    Args:
+        field (object): Field or column metadata used by the operation.
+
+    Returns:
+        object: Transformed representation of the supplied input.
+    """
     if not isinstance(field, str):
         return field # Returns original value if it's NaN or Not a String
     
@@ -502,6 +511,15 @@ def parse_field(field):
 
 
 def normalize_report_field(field):
+    """
+    Normalize a report field to displayable text.
+
+    Args:
+        field (object): Field or column metadata used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     parsed = parse_field(field)
     if parsed is None or pd.isna(parsed):
         return ""
@@ -510,12 +528,31 @@ def normalize_report_field(field):
 
 
 def clean_column(results, column):
+    """
+    Normalize every report value in one DataFrame column in place.
+
+    Args:
+        results (object): Input results used by the operation.
+        column (object): Field or column metadata used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     for i in range(len(results[column])):
        field = results.loc[i, column]
        results.loc[i, column] = normalize_report_field(field)
 
 
 def clean_results(results):
+    """
+    Normalize report fields in a DataFrame in place.
+
+    Args:
+        results (object): Input results used by the operation.
+
+    Returns:
+        object: Transformed representation of the supplied input.
+    """
     for column in results.columns.to_list():
         if column in REPORT_FIELDS:
             clean_column(results, column)
@@ -523,6 +560,15 @@ def clean_results(results):
 
 
 def compile_report_column(results):
+    """
+    Combine available report fields into one display column.
+
+    Args:
+        results (object): Input results used by the operation.
+
+    Returns:
+        object: Transformed representation of the supplied input.
+    """
     report_columns = [
         column for column in REPORT_FIELDS
         if column in results.columns
@@ -543,6 +589,20 @@ def compile_report_column(results):
 
 
 def process_input_file(file_path, target_column):
+    """
+    Read identifiers from a text or CSV input file.
+
+    Args:
+        file_path (object): Path to the input file or directory.
+        target_column (object): Input target column used by the operation.
+
+    Returns:
+        list: Identifier values read from the requested input source.
+
+    Raises:
+        KeyError: If validation or the underlying resource operation fails.
+        ValueError: If validation or the underlying resource operation fails.
+    """
     with open(file_path, 'r', newline='', encoding='utf-8') as f:
         if target_column is None:
             return [line.strip() for line in f if line.strip()]
@@ -564,10 +624,31 @@ def process_input_file(file_path, target_column):
 
 
 def escape_sql_literal(value):
+    """
+    Escape apostrophes in a value before embedding it in SQL.
+
+    Args:
+        value (object): Input value to validate, transform, or persist.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     return value.replace("'", "''")
 
 
 def parse_accession_id(accession_id):
+    """
+    Validate and parse an accession identifier into its components.
+
+    Args:
+        accession_id (object): Input accession id used by the operation.
+
+    Returns:
+        dict: Parsed accession components, or an exception for invalid input.
+
+    Raises:
+        ValueError: If validation or the underlying resource operation fails.
+    """
     normalized_accession_id = accession_id.strip()
     if not normalized_accession_id:
         raise ValueError("accession ID must not be blank")
@@ -575,6 +656,15 @@ def parse_accession_id(accession_id):
 
 
 def split_valid_invalid_accessions(accession_ids):
+    """
+    Separate valid unique accessions from invalid input values.
+
+    Args:
+        accession_ids (object): Identifier values to process.
+
+    Returns:
+        tuple: Collection produced from the supplied input or stored state.
+    """
     valid_accessions = []
     invalid_accessions = []
     seen_accession_keys = set()
@@ -602,6 +692,16 @@ def split_valid_invalid_accessions(accession_ids):
 
 
 def write_invalid_accessions_csv(invalid_accessions, output_path=INVALID_ACCESSIONS_FILENAME):
+    """
+    Write the invalid accessions CSV.
+
+    Args:
+        invalid_accessions (object): Input invalid accessions used by the operation.
+        output_path (object): Path to the output.
+
+    Returns:
+        object: Output path when invalid accessions were written, otherwise None.
+    """
     if not invalid_accessions:
         return None
 
@@ -614,6 +714,18 @@ def write_invalid_accessions_csv(invalid_accessions, output_path=INVALID_ACCESSI
 
 
 def normalize_ids(ids):
+    """
+    Normalize and de-duplicate identifier values while preserving order.
+
+    Args:
+        ids (object): Identifier values to process.
+
+    Returns:
+        object: Transformed representation of the supplied input.
+
+    Raises:
+        ValueError: If validation or the underlying resource operation fails.
+    """
     normalized_ids = []
     seen = set()
 
@@ -632,10 +744,30 @@ def normalize_ids(ids):
 
 
 def chunk_ids(ids, chunk_size):
+    """
+    Split identifiers into fixed-size batches.
+
+    Args:
+        ids (object): Identifier values to process.
+        chunk_size (object): Input chunk size used by the operation.
+
+    Returns:
+        list: List of identifier batches.
+    """
     return [ids[i:i + chunk_size] for i in range(0, len(ids), chunk_size)]
 
 
 def format_insert_statements(ids, batch_size):
+    """
+    Format identifier batches as SQL INSERT statements.
+
+    Args:
+        ids (object): Identifier values to process.
+        batch_size (object): Numeric limit, duration, or count controlling the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     statements = []
     for chunk in chunk_ids(ids, batch_size):
         statements.append(format_insert_statement(chunk))
@@ -644,6 +776,18 @@ def format_insert_statements(ids, batch_size):
 
 
 def validate_batch_size(batch_size):
+    """
+    Validate the batch size.
+
+    Args:
+        batch_size (object): Numeric limit, duration, or count controlling the operation.
+
+    Returns:
+        object: Validated positive batch size.
+
+    Raises:
+        ValueError: If validation or the underlying resource operation fails.
+    """
     if batch_size < 1:
         raise ValueError("Error: batch size must be at least 1")
 
@@ -651,6 +795,15 @@ def validate_batch_size(batch_size):
 
 
 def format_insert_statement(ids):
+    """
+    Format one identifier batch as a SQL INSERT statement.
+
+    Args:
+        ids (object): Identifier values to process.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     formatted_rows = [f"('{escape_sql_literal(cur_id)}')" for cur_id in ids]
     values_block = ",\n  ".join(formatted_rows)
 
@@ -662,6 +815,16 @@ def format_insert_statement(ids):
 
 
 def format_accession_insert_statements(accessions, batch_size):
+    """
+    Format accession batches as SQL INSERT statements.
+
+    Args:
+        accessions (object): Identifier values to process.
+        batch_size (object): Numeric limit, duration, or count controlling the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     statements = []
     for chunk in chunk_ids(accessions, batch_size):
         statements.append(format_accession_insert_statement(chunk))
@@ -670,6 +833,15 @@ def format_accession_insert_statements(accessions, batch_size):
 
 
 def format_accession_insert_statement(accessions):
+    """
+    Format one accession batch as a SQL INSERT statement.
+
+    Args:
+        accessions (object): Identifier values to process.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     formatted_rows = [
         f"(N'{escape_sql_literal(accession['accession_id'])}')"
         for accession in accessions
@@ -684,6 +856,16 @@ def format_accession_insert_statement(accessions):
 
 
 def format_report_query(query_template, insert_statements):
+    """
+    Fill a report-query template with SQL fragments for text fields.
+
+    Args:
+        query_template (object): Query or query template to execute or format.
+        insert_statements (object): Input insert statements used by the operation.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+    """
     return query_template.format(
         insert_statements=insert_statements,
         text_agg_columns=format_text_agg_columns(indent="          "),
@@ -693,6 +875,16 @@ def format_report_query(query_template, insert_statements):
 
 
 def format_query(insert_statements, id_type):
+    """
+    Select and format the appropriate CoPath query for an identifier type.
+
+    Args:
+        insert_statements (object): Input insert statements used by the operation.
+        id_type (object): Input id type used by the operation.
+
+    Returns:
+        object: Transformed representation of the supplied input.
+    """
     match id_type:
         case 'accession':
             return format_report_query(acc_query, insert_statements)
@@ -703,6 +895,18 @@ def format_query(insert_statements, id_type):
 
 
 def build_query_output(ids, id_type, batch_size, separate_queries):
+    """
+    Build one or more CoPath query strings for identifiers.
+
+    Args:
+        ids (object): Identifier values to process.
+        id_type (object): Input id type used by the operation.
+        batch_size (object): Numeric limit, duration, or count controlling the operation.
+        separate_queries (object): Boolean option controlling whether the operation is forced or broadened.
+
+    Returns:
+        object | str: Formatted CoPath query text or a collection of separate queries.
+    """
     if not separate_queries:
         insert_statements = format_insert_statements(ids, batch_size)
         return format_query(insert_statements, id_type)
@@ -720,6 +924,18 @@ def build_query_output(ids, id_type, batch_size, separate_queries):
 
 
 def build_accession_query_output(accessions, batch_size, separate_queries, id_type='accession'):
+    """
+    Build one or more CoPath query strings for accession records.
+
+    Args:
+        accessions (object): Identifier values to process.
+        batch_size (object): Numeric limit, duration, or count controlling the operation.
+        separate_queries (object): Boolean option controlling whether the operation is forced or broadened.
+        id_type (object): Input id type used by the operation.
+
+    Returns:
+        object | str: Formatted accession query text or separate query text.
+    """
     if not separate_queries:
         insert_statements = format_accession_insert_statements(accessions, batch_size)
         return format_query(insert_statements, id_type)

@@ -12,6 +12,12 @@ import app as app_module
 
 
 def rollup() -> None:
+    """
+    Roll up durable user statistics into their CSV materializations.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     cutoff = datetime.date.today() - datetime.timedelta(days=1)
     app_module.user_manager.load()
     for user in app_module.user_manager.get_all():
@@ -20,6 +26,12 @@ def rollup() -> None:
 
 
 def run_forever() -> None:
+    """
+    Run the statistics scheduler until the process is stopped.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+    """
     last_run_for_date = None
     while True:
         today = datetime.date.today()
@@ -30,6 +42,12 @@ def run_forever() -> None:
 
 
 def main() -> None:
+    """
+    Run the command-line entry point.
+
+    Returns:
+        None: Process exit status, where applicable.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--once", action="store_true")
     arguments = parser.parse_args()

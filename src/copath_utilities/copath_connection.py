@@ -23,11 +23,31 @@ class CoPathConfigurationError(RuntimeError):
 
 
 def _property_name(value: str) -> str:
+    """
+    Normalize a CoPath connection-property name.
+
+    Args:
+        value (str): Input value to validate, transform, or persist.
+
+    Returns:
+        str: Normalized uppercase property name.
+    """
     return re.sub(r"[ _-]+", "_", value.strip()).upper()
 
 
 def connection_properties(connection: str) -> Dict[str, str]:
-    """Parse the simple semicolon-delimited properties used by this service."""
+    """
+    Parse the simple semicolon-delimited properties used by this service.
+
+    Args:
+        connection (str): Database connection or connection-string value used by the operation.
+
+    Returns:
+        Dict[str, str]: Normalized connection-property dictionary.
+
+    Raises:
+        CoPathConfigurationError: If validation or the underlying resource operation fails.
+    """
     if re.search(r"\bTrustSererCertificate\s*=", connection, re.IGNORECASE):
         raise CoPathConfigurationError(
             "The CoPath connection string contains 'TrustSererCertificate'; "
@@ -71,7 +91,15 @@ def connection_properties(connection: str) -> Dict[str, str]:
 
 
 def connection_string() -> str:
-    """Return a validated connection string without ever logging its contents."""
+    """
+    Return a validated connection string without ever logging its contents.
+
+    Returns:
+        str: Validated CoPath connection string.
+
+    Raises:
+        CoPathConfigurationError: If validation or the underlying resource operation fails.
+    """
     configured_path = os.environ.get("COPATH_CONNECTION_STRING_FILE", "").strip()
     if configured_path:
         try:
@@ -88,7 +116,18 @@ def connection_string() -> str:
 
 
 def require_windows_ticket(connection: str) -> None:
-    """Require a valid Kerberos cache when ODBC Windows Authentication is enabled."""
+    """
+    Require a valid Kerberos cache when ODBC Windows Authentication is enabled.
+
+    Args:
+        connection (str): Database connection or connection-string value used by the operation.
+
+    Returns:
+        None: The operation completes through its side effects and returns no value.
+
+    Raises:
+        CoPathConfigurationError: If validation or the underlying resource operation fails.
+    """
     properties = connection_properties(connection)
     trusted = properties.get("TRUSTED_CONNECTION", "").casefold()
     integrated = properties.get("INTEGRATED_SECURITY", "").casefold()
@@ -124,7 +163,12 @@ def require_windows_ticket(connection: str) -> None:
 
 
 def prepared_connection_string() -> str:
-    """Return the validated string after checking its Windows credential cache."""
+    """
+    Return the validated string after checking its Windows credential cache.
+
+    Returns:
+        str: Validated connection string ready for the CoPath client.
+    """
     connection = connection_string()
     require_windows_ticket(connection)
     return connection

@@ -26,6 +26,19 @@ QUEUE_FIELDS = [
 
 
 def parse_bool(value: object, source: Path) -> bool:
+    """
+    Parse a stored boolean value and reject unsupported text.
+
+    Args:
+        value (object): Input value to validate, transform, or persist.
+        source (Path): Input source used by the operation.
+
+    Returns:
+        bool: Whether the requested condition or validation succeeds.
+
+    Raises:
+        ValueError: If validation or the underlying resource operation fails.
+    """
     normalized = str(value or "").strip().lower()
     if normalized not in {"true", "false"}:
         raise ValueError(f"{source}: boolean values must be True or False")
@@ -33,6 +46,19 @@ def parse_bool(value: object, source: Path) -> bool:
 
 
 def read_csv(path: Path, expected_fields: Optional[list[str]] = None) -> tuple[list[str], list[dict]]:
+    """
+    Read a CSV file and return its headers and rows.
+
+    Args:
+        path (Path): Path to the input file or directory.
+        expected_fields (Optional[list[str]]): Input expected fields used by the operation.
+
+    Returns:
+        tuple[list[str], list[dict]]: Tuple containing the CSV headers and row dictionaries.
+
+    Raises:
+        ValueError: If validation or the underlying resource operation fails.
+    """
     try:
         with path.open("r", newline="", encoding="utf-8-sig") as handle:
             reader = csv.DictReader(handle)
@@ -47,11 +73,34 @@ def read_csv(path: Path, expected_fields: Optional[list[str]] = None) -> tuple[l
 
 
 def legacy_queue_name(runtime_root: str, relative_path: str) -> str:
+    """
+    Return the legacy queue filename for a runtime and batch path.
+
+    Args:
+        runtime_root (str): Directory used as the runtime root.
+        relative_path (str): Path to the relative.
+
+    Returns:
+        str: Stable legacy queue filename.
+    """
     runtime_path = str(PurePosixPath(runtime_root) / PurePosixPath(relative_path))
     return hashlib.sha256(runtime_path.encode("utf-8")).hexdigest()[:16] + ".csv"
 
 
 def reconciled_queue(queue_rows: Iterable[dict], slides: list[dict]) -> list[dict]:
+    """
+    Reconcile legacy queue rows with the current slide set.
+
+    Args:
+        queue_rows (Iterable[dict]): Input queue rows used by the operation.
+        slides (list[dict]): Input slides used by the operation.
+
+    Returns:
+        list[dict]: Queue rows aligned with current slide indices.
+
+    Raises:
+        ValueError: If validation or the underlying resource operation fails.
+    """
     current: Dict[int, dict] = {}
     for row in queue_rows:
         try:
@@ -75,6 +124,15 @@ def reconciled_queue(queue_rows: Iterable[dict], slides: list[dict]) -> list[dic
 
 
 def sha256_file(path: Path) -> str:
+    """
+    Calculate the SHA-256 digest of a file.
+
+    Args:
+        path (Path): Path to the input file or directory.
+
+    Returns:
+        str: Hexadecimal SHA-256 digest.
+    """
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
@@ -83,6 +141,18 @@ def sha256_file(path: Path) -> str:
 
 
 def collect(args: argparse.Namespace) -> tuple[list[dict], list[tuple[Path, str]], list[str]]:
+    """
+    Collect legacy batch records, source files, and migration warnings.
+
+    Args:
+        args (argparse.Namespace): Input args used by the operation.
+
+    Returns:
+        tuple[list[dict], list[tuple[Path, str]], list[str]]: Records, source paths, and migration warnings.
+
+    Raises:
+        ValueError: If validation or the underlying resource operation fails.
+    """
     batches_root = args.batches_root.resolve()
     queue_root = args.state_root.resolve() / "instance" / "batch_queues"
     records: list[dict] = []
@@ -162,6 +232,19 @@ def collect(args: argparse.Namespace) -> tuple[list[dict], list[tuple[Path, str]
 
 
 def build_database(records: list[dict], temporary_instance: Path) -> Path:
+    """
+    Build a batch catalog database from collected legacy records.
+
+    Args:
+        records (list[dict]): Data rows to process.
+        temporary_instance (Path): Input temporary instance used by the operation.
+
+    Returns:
+        Path: Filesystem path produced by the operation.
+
+    Raises:
+        RuntimeError: If validation or the underlying resource operation fails.
+    """
     store = BatchCatalog()
     for record in records:
         public_id = store.upsert_batch(
@@ -193,6 +276,19 @@ def build_database(records: list[dict], temporary_instance: Path) -> Path:
 
 
 def archive_sources(instance_dir: Path, sources: list[tuple[Path, str]]) -> Path:
+    """
+    Archive migrated legacy source files and write an archive manifest.
+
+    Args:
+        instance_dir (Path): Directory used as the instance dir.
+        sources (list[tuple[Path, str]]): Input sources used by the operation.
+
+    Returns:
+        Path: Path to the archived legacy state.
+
+    Raises:
+        RuntimeError: If validation or the underlying resource operation fails.
+    """
     timestamp = dt.datetime.now().strftime("%Y%m%dT%H%M%S")
     archive = instance_dir / "legacy_batch_state_archive" / timestamp
     manifest_rows = []
@@ -224,6 +320,12 @@ def archive_sources(instance_dir: Path, sources: list[tuple[Path, str]]) -> Path
 
 
 def parser() -> argparse.ArgumentParser:
+    """
+    Create the command-line argument parser for batch-catalog migration.
+
+    Returns:
+        argparse.ArgumentParser: Transformed representation of the supplied input.
+    """
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument(
         "--batches-root", type=Path,
@@ -240,6 +342,15 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
+    """
+    Run the command-line entry point.
+
+    Args:
+        argv (Optional[list[str]]): Input argv used by the operation.
+
+    Returns:
+        int: Process exit status, where applicable.
+    """
     args = parser().parse_args(argv)
     try:
         records, sources, warnings = collect(args)

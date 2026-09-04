@@ -17,11 +17,28 @@ QUEUE_STATUSES = {"pending", "leased", "completed"}
 
 
 def utc_now() -> str:
+    """
+    Return the current time as an ISO 8601 UTC timestamp.
+
+    Returns:
+        str: Current UTC timestamp string.
+    """
     return dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def normalize_relative_path(value: str) -> str:
-    """Return a safe, portable scanner/batch catalog key."""
+    """
+    Return a safe, portable scanner/batch catalog key.
+
+    Args:
+        value (str): Input value to validate, transform, or persist.
+
+    Returns:
+        str: String representation or formatted value produced by the operation.
+
+    Raises:
+        ValueError: If validation or the underlying resource operation fails.
+    """
     normalized = str(PurePosixPath(str(value).replace("\\", "/")))
     path = PurePosixPath(normalized)
     if normalized in {"", "."} or path.is_absolute() or ".." in path.parts:
@@ -32,6 +49,15 @@ def normalize_relative_path(value: str) -> str:
 
 
 def public_batch_id(relative_path: str) -> str:
+    """
+    Derive a stable public ID from a normalized relative batch path.
+
+    Args:
+        relative_path (str): Path to the relative.
+
+    Returns:
+        str: Stable 16-character public batch identifier.
+    """
     key = normalize_relative_path(relative_path).casefold()
     return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
 
@@ -40,17 +66,47 @@ class BatchCatalog:
     """Thread-safe SQLite access with a dynamically configurable instance root."""
 
     def __init__(self) -> None:
+        """
+        Initialize the BatchCatalog instance.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self._schema_path: Optional[Path] = None
         self._schema_lock = threading.Lock()
 
     @staticmethod
     def database_path(instance_dir: str | Path) -> Path:
+        """
+        Return the SQLite database path beneath an instance directory.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+
+        Returns:
+            Path: SQLite database path under the instance directory.
+        """
         return Path(instance_dir) / "batch_catalog.sqlite3"
 
     def reset(self) -> None:
+        """
+        Clear the cached catalog schema path so configuration is reloaded.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         self._schema_path = None
 
     def _connect(self, instance_dir: str | Path) -> sqlite3.Connection:
+        """
+        Open a configured SQLite connection after ensuring its schema exists.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+
+        Returns:
+            sqlite3.Connection: Open SQLite connection configured for the batch catalog.
+        """
         path = self.database_path(instance_dir)
         self._ensure_schema(path)
         connection = sqlite3.connect(path, timeout=30)
@@ -61,6 +117,15 @@ class BatchCatalog:
 
     @contextlib.contextmanager
     def connection(self, instance_dir: str | Path) -> Iterator[sqlite3.Connection]:
+        """
+        Provide a transaction-managed SQLite connection context.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+
+        Returns:
+            Iterator[sqlite3.Connection]: Context-managed batch-catalog SQLite connection.
+        """
         connection = self._connect(instance_dir)
         try:
             with connection:
@@ -69,6 +134,18 @@ class BatchCatalog:
             connection.close()
 
     def _ensure_schema(self, path: Path) -> None:
+        """
+        Create the backing SQLite schema and secure its runtime paths when needed.
+
+        Args:
+            path (Path): Path to the input file or directory.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            RuntimeError: If validation or the underlying resource operation fails.
+        """
         if self._schema_path == path and path.exists():
             return
         with self._schema_lock:
@@ -153,6 +230,19 @@ class BatchCatalog:
 
     @staticmethod
     def _batch_row(connection: sqlite3.Connection, public_id: str) -> sqlite3.Row:
+        """
+        Load one batch row by public ID inside an open catalog connection.
+
+        Args:
+            connection (sqlite3.Connection): Database connection or connection-string value used by the operation.
+            public_id (str): Identifier of the batch to operate on.
+
+        Returns:
+            sqlite3.Row: Matching SQLite batch row.
+
+        Raises:
+            KeyError: If validation or the underlying resource operation fails.
+        """
         row = connection.execute(
             "SELECT * FROM batches WHERE public_id=?", (public_id,)
         ).fetchone()
@@ -161,6 +251,15 @@ class BatchCatalog:
         return row
 
     def list_batches(self, instance_dir: str | Path) -> list[dict]:
+        """
+        Return catalog entries ordered for display.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+
+        Returns:
+            list[dict]: List of catalog batch dictionaries.
+        """
         with self.connection(instance_dir) as connection:
             rows = connection.execute(
                 """
@@ -176,6 +275,16 @@ class BatchCatalog:
             return [dict(row) for row in rows]
 
     def get_batch(self, instance_dir: str | Path, public_id: str) -> Optional[dict]:
+        """
+        Return one catalog entry by public ID, or no entry when absent.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            public_id (str): Identifier of the batch to operate on.
+
+        Returns:
+            Optional[dict]: Batch dictionary, or None when no matching batch exists.
+        """
         with self.connection(instance_dir) as connection:
             row = connection.execute(
                 """
@@ -208,6 +317,27 @@ class BatchCatalog:
         history_status: str = "not_needed",
         preserve_stages: bool = True,
     ) -> str:
+        """
+        Insert or update a batch catalog entry and its derived queue counts.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            relative_path (str): Path to the relative.
+            qc_complete (bool): Input QC complete used by the operation.
+            renamed_complete (bool): Input renamed complete used by the operation.
+            validity (str): Input validity used by the operation.
+            validation_error (str): Input validation error used by the operation.
+            slide_count (int): Input slide count used by the operation.
+            enriched_mtime_ns (Optional[int]): Input enriched mtime ns used by the operation.
+            mapping_mtime_ns (Optional[int]): Input mapping mtime ns used by the operation.
+            history_mtime_ns (Optional[int]): Input history mtime ns used by the operation.
+            renaming_status (str): Input renaming status used by the operation.
+            history_status (str): Input history status used by the operation.
+            preserve_stages (bool): Boolean option controlling whether the operation is forced or broadened.
+
+        Returns:
+            str: Stable public batch identifier.
+        """
         relative_path = normalize_relative_path(relative_path)
         scanner_name, batch_name = PurePosixPath(relative_path).parts
         public_id = public_batch_id(relative_path)
@@ -260,6 +390,16 @@ class BatchCatalog:
     def mark_unseen_missing(
         self, instance_dir: str | Path, seen_relative_paths: Sequence[str]
     ) -> None:
+        """
+        Mark catalog batches not observed during reconciliation as missing.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            seen_relative_paths (Sequence[str]): Input seen relative paths used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         normalized = [normalize_relative_path(path) for path in seen_relative_paths]
         with self.connection(instance_dir) as connection:
             if not normalized:
@@ -281,6 +421,20 @@ class BatchCatalog:
         public_id: str,
         rows: Iterable[Mapping[str, object]],
     ) -> None:
+        """
+        Replace all queue rows for a catalog batch.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            public_id (str): Identifier of the batch to operate on.
+            rows (Iterable[Mapping[str, object]]): Data rows to process.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            ValueError: If validation or the underlying resource operation fails.
+        """
         values = []
         seen: set[int] = set()
         for row in rows:
@@ -320,7 +474,21 @@ class BatchCatalog:
         rows: Iterable[Mapping[str, object]],
         deleted_indices: Iterable[int] = (),
     ) -> None:
-        """Persist only changed queue rows so unrelated concurrent leases survive."""
+        """
+        Persist only changed queue rows so unrelated concurrent leases survive.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            public_id (str): Identifier of the batch to operate on.
+            rows (Iterable[Mapping[str, object]]): Data rows to process.
+            deleted_indices (Iterable[int]): Input deleted indices used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+
+        Raises:
+            ValueError: If validation or the underlying resource operation fails.
+        """
         values = []
         for row in rows:
             index = int(row["original_index"])
@@ -367,6 +535,16 @@ class BatchCatalog:
             )
 
     def load_queue(self, instance_dir: str | Path, public_id: str) -> list[dict]:
+        """
+        Load queue rows for a catalog batch.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            public_id (str): Identifier of the batch to operate on.
+
+        Returns:
+            list[dict]: Queue-row dictionaries for the batch.
+        """
         with self.connection(instance_dir) as connection:
             batch = self._batch_row(connection, public_id)
             rows = connection.execute(
@@ -384,7 +562,19 @@ class BatchCatalog:
         leased_at: str,
         original_index: Optional[int] = None,
     ) -> Optional[dict]:
-        """Atomically retain/acquire one lease for user, optionally by index."""
+        """
+        Atomically retain/acquire one lease for user, optionally by index.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            public_id (str): Identifier of the batch to operate on.
+            user_id (str): Identifier of the user associated with the operation.
+            leased_at (str): Reference time or date used for the operation.
+            original_index (Optional[int]): Input original index used by the operation.
+
+        Returns:
+            Optional[dict]: The claimed queue row, or None when no row is available.
+        """
         connection = self._connect(instance_dir)
         try:
             connection.execute("BEGIN IMMEDIATE")
@@ -458,6 +648,17 @@ class BatchCatalog:
     def release_expired(
         self, instance_dir: str | Path, public_id: str, before_iso: str
     ) -> int:
+        """
+        Release queue items whose leases have expired.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            public_id (str): Identifier of the batch to operate on.
+            before_iso (str): Input before ISO used by the operation.
+
+        Returns:
+            int: Number of leases released.
+        """
         with self.connection(instance_dir) as connection:
             batch = self._batch_row(connection, public_id)
             cursor = connection.execute(
@@ -472,6 +673,17 @@ class BatchCatalog:
     def release_user(
         self, instance_dir: str | Path, public_id: str, user_id: str
     ) -> int:
+        """
+        Release all queue items leased by a user.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            public_id (str): Identifier of the batch to operate on.
+            user_id (str): Identifier of the user associated with the operation.
+
+        Returns:
+            int: Number of leases released for the user.
+        """
         with self.connection(instance_dir) as connection:
             batch = self._batch_row(connection, public_id)
             cursor = connection.execute(
@@ -491,6 +703,21 @@ class BatchCatalog:
         qc_complete: Optional[bool] = None,
         renamed_complete: Optional[bool] = None,
     ) -> dict:
+        """
+        Update workflow-stage flags and return the resulting catalog state.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            public_id (str): Identifier of the batch to operate on.
+            qc_complete (Optional[bool]): Input QC complete used by the operation.
+            renamed_complete (Optional[bool]): Input renamed complete used by the operation.
+
+        Returns:
+            dict: Updated batch-stage metadata dictionary.
+
+        Raises:
+            KeyError: If validation or the underlying resource operation fails.
+        """
         assignments = ["updated_at=?"]
         values: list[object] = [utc_now()]
         if qc_complete is not None:
@@ -512,7 +739,16 @@ class BatchCatalog:
     def mark_qc_complete_if_queue_complete(
         self, instance_dir: str | Path, public_id: str
     ) -> bool:
-        """Set QC complete only when queue has rows and none remain unfinished."""
+        """
+        Set QC complete only when queue has rows and none remain unfinished.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            public_id (str): Identifier of the batch to operate on.
+
+        Returns:
+            bool: Whether the requested condition or validation succeeds.
+        """
         connection = self._connect(instance_dir)
         try:
             connection.execute("BEGIN IMMEDIATE")
@@ -541,6 +777,17 @@ class BatchCatalog:
             connection.close()
 
     def set_metadata(self, instance_dir: str | Path, key: str, value: str) -> None:
+        """
+        Persist one catalog metadata value.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            key (str): Input key used by the operation.
+            value (str): Input value to validate, transform, or persist.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         with self.connection(instance_dir) as connection:
             connection.execute(
                 "INSERT INTO catalog_metadata(key,value) VALUES(?,?) "
@@ -549,6 +796,16 @@ class BatchCatalog:
             )
 
     def get_metadata(self, instance_dir: str | Path, key: str) -> Optional[str]:
+        """
+        Return one catalog metadata value, or None when absent.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            key (str): Input key used by the operation.
+
+        Returns:
+            Optional[str]: Stored metadata string, or None when absent.
+        """
         with self.connection(instance_dir) as connection:
             row = connection.execute(
                 "SELECT value FROM catalog_metadata WHERE key=?", (key,)
@@ -558,6 +815,17 @@ class BatchCatalog:
     def acquire_reconcile_lease(
         self, instance_dir: str | Path, owner: str, lease_seconds: int
     ) -> bool:
+        """
+        Acquire the catalog reconciliation lease when it is available.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            owner (str): Input owner used by the operation.
+            lease_seconds (int): Input lease seconds used by the operation.
+
+        Returns:
+            bool: True when the lease was acquired; otherwise False.
+        """
         connection = self._connect(instance_dir)
         try:
             connection.execute("BEGIN IMMEDIATE")
@@ -588,6 +856,16 @@ class BatchCatalog:
             connection.close()
 
     def release_reconcile_lease(self, instance_dir: str | Path, owner: str) -> None:
+        """
+        Release a catalog reconciliation lease owned by this process.
+
+        Args:
+            instance_dir (str | Path): Directory used as the instance dir.
+            owner (str): Input owner used by the operation.
+
+        Returns:
+            None: The operation completes through its side effects and returns no value.
+        """
         with self.connection(instance_dir) as connection:
             connection.execute(
                 "DELETE FROM catalog_metadata WHERE key='reconcile_lease' AND value LIKE ?",
