@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - SVS Slide QC</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
+    <style nonce="{{ csp_nonce() }}">
         :root {
             --primary-color: #007bff;
             --primary-dark: #0056b3;
@@ -17,7 +16,7 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: system-ui, sans-serif;
             background-color: var(--light-bg);
             display: flex;
             justify-content: center;
@@ -142,6 +141,8 @@
     <div class="login-container">
         <h2>Login</h2>
         <form method="POST" action="{{ url_for('login') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
             <div class="form-group">
                 <label for="username">Username:</label>
                 <input type="text" id="username" name="username" required autocomplete="username">

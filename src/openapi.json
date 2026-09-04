@@ -1,0 +1,138 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Label-Check Pipeline API",
+    "version": "1.0.0",
+    "description": "Submit and monitor Label-Check pipeline jobs. All paths are server-visible filesystem paths."
+  },
+  "servers": [{"url": "/api/v1"}],
+  "security": [{"bearerAuth": []}],
+  "paths": {
+    "/pipeline/jobs": {
+      "post": {
+        "operationId": "createPipelineJob",
+        "summary": "Submit a pipeline job",
+        "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PipelineRequest"}}}
+        },
+        "responses": {
+          "202": {"description": "Job accepted", "headers": {"Location": {"schema": {"type": "string", "format": "uri"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JobResponse"}}}},
+          "401": {"$ref": "#/components/responses/Problem"},
+          "403": {"$ref": "#/components/responses/Problem"},
+          "409": {"$ref": "#/components/responses/Problem"},
+          "415": {"$ref": "#/components/responses/Problem"},
+          "422": {"$ref": "#/components/responses/Problem"},
+          "429": {"$ref": "#/components/responses/Problem"}
+        }
+      }
+    },
+    "/pipeline/jobs/{job_id}": {
+      "get": {
+        "operationId": "getPipelineJob",
+        "summary": "Inspect a pipeline job",
+        "parameters": [{"$ref": "#/components/parameters/JobId"}],
+        "responses": {
+          "200": {"description": "Job metadata", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JobResponse"}}}},
+          "401": {"$ref": "#/components/responses/Problem"},
+          "403": {"$ref": "#/components/responses/Problem"},
+          "404": {"$ref": "#/components/responses/Problem"},
+          "429": {"$ref": "#/components/responses/Problem"}
+        }
+      }
+    },
+    "/pipeline/jobs/{job_id}/output": {
+      "get": {
+        "operationId": "getPipelineJobOutput",
+        "summary": "Read pipeline output",
+        "parameters": [
+          {"$ref": "#/components/parameters/JobId"},
+          {"name": "offset", "in": "query", "schema": {"type": "integer", "minimum": 0, "default": 0}},
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 65536, "default": 16384}}
+        ],
+        "responses": {
+          "200": {"description": "Output chunk", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OutputResponse"}}}},
+          "401": {"$ref": "#/components/responses/Problem"},
+          "403": {"$ref": "#/components/responses/Problem"},
+          "404": {"$ref": "#/components/responses/Problem"},
+          "422": {"$ref": "#/components/responses/Problem"},
+          "429": {"$ref": "#/components/responses/Problem"}
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "operationId": "getOpenApiContract",
+        "summary": "Get this OpenAPI contract",
+        "responses": {
+          "200": {"description": "OpenAPI 3.1 document"},
+          "401": {"$ref": "#/components/responses/Problem"},
+          "403": {"$ref": "#/components/responses/Problem"},
+          "429": {"$ref": "#/components/responses/Problem"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "Label-Check PAT"}
+    },
+    "parameters": {
+      "IdempotencyKey": {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 128}},
+      "JobId": {"name": "job_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+    },
+    "schemas": {
+      "PipelineRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["input_dir", "output_dir"],
+        "properties": {
+          "input_dir": {"type": "string", "description": "Existing server directory beneath a configured pipeline input root."},
+          "output_dir": {"type": "string", "description": "Server directory beneath a configured pipeline output root."},
+          "start_from": {"type": "integer", "enum": [1, 2, 3], "default": 1},
+          "end_at": {"type": "integer", "enum": [1, 2, 3], "default": 3},
+          "input_mode": {"type": "string", "enum": ["auto", "slides", "images"], "default": "auto"},
+          "macro_workers": {"type": "integer", "minimum": 1, "maximum": 8, "default": 4},
+          "macro_extensions": {"type": "array", "items": {"type": "string"}, "default": ["svs"]},
+          "macro_image_extensions": {"type": "array", "items": {"type": "string"}, "default": ["png", "jpg", "jpeg", "tif", "tiff", "bmp"]},
+          "thumbnail_width": {"type": "integer", "minimum": 1, "maximum": 4096, "default": 300},
+          "thumbnail_height": {"type": "integer", "minimum": 1, "maximum": 4096, "default": 300},
+          "ocr_workers": {"type": "integer", "minimum": 1, "maximum": 8, "default": 4},
+          "ocr_use_cpu": {"type": "boolean", "default": false},
+          "naming_accession_pattern": {"type": "string"},
+          "naming_workers": {"type": "integer", "minimum": 1, "maximum": 8, "default": 4}
+        }
+      },
+      "PipelineJob": {
+        "type": "object",
+        "required": ["id", "status", "created_at", "links"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"},
+          "status": {"type": "string", "enum": ["running", "succeeded", "failed", "interrupted"]},
+          "created_at": {"type": "string", "format": "date-time"},
+          "started_at": {"type": ["string", "null"], "format": "date-time"},
+          "completed_at": {"type": ["string", "null"], "format": "date-time"},
+          "return_code": {"type": ["integer", "null"]},
+          "links": {"type": "object", "additionalProperties": {"type": "string", "format": "uri"}}
+        }
+      },
+      "JobResponse": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/PipelineJob"}}},
+      "OutputResponse": {
+        "type": "object",
+        "required": ["data"],
+        "properties": {"data": {"type": "object", "required": ["job_id", "output", "offset", "next_offset", "eof", "status"], "properties": {
+          "job_id": {"type": "string", "format": "uuid"}, "output": {"type": "string"}, "offset": {"type": "integer"}, "next_offset": {"type": "integer"}, "eof": {"type": "boolean"}, "status": {"type": "string"}
+        }}}
+      },
+      "Problem": {
+        "type": "object",
+        "required": ["type", "status", "code", "title", "detail", "request_id"],
+        "properties": {"type": {"type": "string", "format": "uri"}, "status": {"type": "integer"}, "code": {"type": "string"}, "title": {"type": "string"}, "detail": {"type": "string"}, "request_id": {"type": "string"}}
+      }
+    },
+    "responses": {
+      "Problem": {"description": "Problem response", "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/Problem"}}}}
+    }
+  }
+}

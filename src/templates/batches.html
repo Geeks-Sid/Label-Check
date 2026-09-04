@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choose Batch - Label Check</title>
+    <style nonce="{{ csp_nonce() }}">
+        :root { --primary: #007bff; --primary-dark: #0056b3; --bg: #f8f9fa; --text: #343a40; }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: Arial, sans-serif; }
+        header { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 15px 30px; background: linear-gradient(90deg, var(--primary), var(--primary-dark)); color: white; }
+        header h1 { margin: 0; font-size: 1.5rem; }
+        header a { color: white; text-decoration: none; margin-left: 15px; }
+        main { width: min(900px, calc(100% - 40px)); margin: 45px auto; }
+        .messages { padding: 0; list-style: none; }
+        .messages li { margin-bottom: 10px; padding: 12px 15px; border-radius: 7px; background: #fff3cd; border: 1px solid #ffe69c; }
+        .messages li.error { background: #f8d7da; border-color: #f1aeb5; }
+        .messages li.success { background: #d1e7dd; border-color: #a3cfbb; }
+        .batch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin-top: 25px; }
+        .batch { display: block; padding: 22px; border: 1px solid #dee2e6; border-radius: 10px; background: white; color: inherit; text-decoration: none; box-shadow: 0 5px 14px rgba(0,0,0,.07); }
+        .batch:hover, .batch:focus-visible { border-color: var(--primary); transform: translateY(-2px); }
+        .batch h2 { margin: 0 0 8px; color: var(--primary); font-size: 1.2rem; overflow-wrap: anywhere; }
+        .batch p, .empty { color: #6c757d; }
+    </style>
+</head>
+<body>
+{% include '_app_sidebar.html' %}
+    <header>
+        <h1>Choose a QC batch</h1>
+        <nav><a href="{{ url_for('index') }}">Menu</a><a href="{{ url_for('logout') }}">Logout</a></nav>
+    </header>
+    <main>
+        {% if messages or discovery_warnings %}
+            <ul class="messages">
+                {% for message in messages %}<li class="{{ message.category }}">{{ message.message }}</li>{% endfor %}
+                {% for warning in discovery_warnings %}<li>{{ warning }}</li>{% endfor %}
+            </ul>
+        {% endif %}
+        {% if batches %}
+            <p>Select an unfinished batch. This list is refreshed whenever this page is opened.</p>
+            <div class="batch-grid">
+                {% for batch in batches %}
+                    <a class="batch" href="{{ url_for('qc', batch=batch.id) }}">
+                        <h2>{{ batch.display_name }}</h2>
+                        <p>{{ batch.pending_count }} pending of {{ batch.total_count }} slide(s)</p>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty">No unfinished, valid label-check batches are currently available.</p>
+        {% endif %}
+    </main>
+</body>
+</html>

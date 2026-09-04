@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TQ Logs - Label Check</title>
+    <style nonce="{{ csp_nonce() }}">
+        :root { --primary:#007bff;--primary-dark:#0056b3;--bg:#f7f9fb;--text:#27313d;--border:#dce2e8;--muted:#687482; }
+        *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}
+        header{display:flex;justify-content:space-between;align-items:center;padding:15px 30px;color:white;background:linear-gradient(90deg,var(--primary),var(--primary-dark))}
+        header h1{margin:0;font-size:1.5rem} header nav{display:flex;align-items:center;flex-wrap:wrap;gap:14px} header a{color:white;text-decoration:none}
+        main{width:min(1300px,calc(100% - 36px));margin:28px auto}
+        .toolbar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:16px}
+        .button-link{display:inline-block;padding:9px 14px;border-radius:6px;background:var(--primary);color:white;text-decoration:none;font-weight:700}
+        .breadcrumbs{display:flex;flex-wrap:wrap;gap:7px;margin:0;padding:0;list-style:none;color:var(--muted)}
+        .breadcrumbs li:not(:last-child)::after{content:"/";margin-left:7px;color:#98a2b3}.breadcrumbs a{color:var(--primary-dark);text-decoration:none}
+        .layout{display:grid;grid-template-columns:minmax(260px,360px) 1fr;gap:20px}
+        .card{padding:20px;border:1px solid var(--border);border-radius:10px;background:white;box-shadow:0 4px 14px rgba(0,0,0,.05)}
+        h2{margin-top:0}.root{color:var(--muted);overflow-wrap:anywhere}
+        .entries{padding:0;list-style:none}.entries a{display:flex;align-items:center;gap:9px;padding:10px;border-radius:5px;color:var(--primary-dark);text-decoration:none;overflow-wrap:anywhere}.entries a:hover,.entries a.active{background:#eaf3ff}
+        .icon{width:22px;text-align:center}.empty{color:var(--muted)}
+        pre{min-height:400px;max-height:75vh;overflow:auto;padding:16px;border-radius:8px;background:#111820;color:#e7edf3;white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 ui-monospace,Consolas,monospace}
+        .error,.warning,.success{padding:12px;border:1px solid #f1aeb5;border-radius:7px;background:#f8d7da}.warning{border-color:#ffe69c;background:#fff3cd}.success{border-color:#a3cfbb;background:#d1e7dd}
+        @media(max-width:760px){header{align-items:flex-start;flex-direction:column;gap:10px;padding:15px 20px}.layout{grid-template-columns:1fr}.toolbar{align-items:flex-start;flex-direction:column}}
+    </style>
+</head>
+<body>
+{% include '_app_sidebar.html' %}
+<header>
+    <h1>TQ Logs</h1>
+    <nav><a href="{{ url_for('tq_page') }}">Transfers</a><a href="{{ url_for('index') }}">Home</a><a href="{{ url_for('logout') }}">Logout</a></nav>
+</header>
+<main>
+    {% for message in messages %}<p class="{{ message.category }}">{{ message.message }}</p>{% endfor %}
+    <div class="toolbar">
+        <ol class="breadcrumbs" aria-label="TQ folder path">
+            {% for crumb in breadcrumbs %}
+            <li>{% if not loop.last %}<a href="{{ url_for('tq_logs', path=crumb.path) }}">{{ crumb.name }}</a>{% else %}<span>{{ crumb.name }}</span>{% endif %}</li>
+            {% endfor %}
+        </ol>
+        {% if current_user.is_admin %}<a class="button-link" href="{{ url_for('tq_edit_config') }}">Edit Config</a>{% endif %}
+    </div>
+    <div class="layout">
+        <aside class="card">
+            <h2>{% if current_name %}Folder contents{% else %}Log folders{% endif %}</h2>
+            <p class="root">{{ root }}{% if current_name %}/{{ current_name }}{% endif %}</p>
+            {% if error %}<p class="error">{{ error }}</p>{% endif %}
+            <ul class="entries">
+                {% if current_name %}
+                {% set parent = current_name.rsplit('/', 1)[0] if '/' in current_name else '' %}
+                <li><a href="{{ url_for('tq_logs', path=parent) }}"><span class="icon">↩</span><span>Parent folder</span></a></li>
+                {% endif %}
+                {% for entry in entries %}
+                <li>
+                    {% if entry.is_dir %}
+                    <a href="{{ url_for('tq_logs', path=entry.path) }}"><span class="icon">📁</span><span>{{ entry.name }}</span></a>
+                    {% else %}
+                    <a class="{% if entry.path == selected_name %}active{% endif %}" href="{{ url_for('tq_logs', path=current_name, file=entry.path) }}"><span class="icon">📄</span><span>{{ entry.name }}</span></a>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% if not entries and not error %}<p class="empty">This folder is empty.</p>{% endif %}
+        </aside>
+        <section class="card">
+            <h2>{{ selected_name.rsplit('/', 1)[-1] if selected_name else 'Choose a log file' }}</h2>
+            {% if content is not none %}
+                {% if truncated %}<p class="warning">Only the first 1 MiB is shown.</p>{% endif %}
+                <pre>{{ content }}</pre>
+            {% else %}<p class="empty">Open a folder, then select a file to view its contents.</p>{% endif %}
+        </section>
+    </div>
+</main>
+</body>
+</html>

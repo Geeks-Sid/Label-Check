@@ -1,0 +1,61 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='app_shell.css') }}">
+<aside class="app-sidebar" aria-label="Application navigation">
+    <div class="app-sidebar-brand">
+        <a href="{{ url_for('index') }}" title="Label Check"><span class="nav-icon">LC</span><span class="nav-label">Label Check</span></a>
+        <button id="sidebar-toggle" type="button" aria-label="Collapse navigation" aria-expanded="true">‹</button>
+    </div>
+    <nav>
+        <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}" title="Home"><span class="nav-icon">H</span><span class="nav-label">Home</span></a>
+        <a href="{{ url_for('pipeline_launcher') }}" class="{% if request.endpoint and request.endpoint.startswith('pipeline_') %}active{% endif %}" title="Run Label-Check"><span class="nav-icon">P</span><span class="nav-label">Run Label-Check</span></a>
+        <a href="{{ url_for('qc') }}" class="{% if request.endpoint in ('qc', 'update', 'history', 'release_lease', 'search') %}active{% endif %}" title="Quality Control"><span class="nav-icon">Q</span><span class="nav-label">Quality Control</span></a>
+        <a href="{{ url_for('renaming_page') }}" class="{% if request.endpoint and request.endpoint.startswith('renaming') %}active{% endif %}" title="Renaming and Deidentification"><span class="nav-icon">R</span><span class="nav-label">Renaming &amp; Deidentification</span></a>
+        <a href="{{ url_for('sdl') }}" class="{% if request.endpoint == 'sdl' %}active{% endif %}" title="Slide Digitization Log"><span class="nav-icon">S</span><span class="nav-label">Slide Digitization Log</span></a>
+        <a href="{{ url_for('inventories') }}" class="{% if request.endpoint == 'inventories' %}active{% endif %}" title="Scanner Inventories"><span class="nav-icon">I</span><span class="nav-label">Scanner Inventories</span></a>
+        <a href="{{ url_for('tq_page') }}" class="{% if request.endpoint and request.endpoint.startswith('tq') %}active{% endif %}" title="Transfers"><span class="nav-icon">T</span><span class="nav-label">Transfers</span></a>
+        {% if current_user.is_admin %}
+            <a href="{{ url_for('users_management') }}" class="{% if request.endpoint in ('users_management', 'add_user') %}active{% endif %}" title="User Management"><span class="nav-icon">U</span><span class="nav-label">User Management</span></a>
+        {% endif %}
+    </nav>
+    <div class="app-sidebar-footer">
+        <span class="signed-in nav-label">{{ current_user.id }}</span>
+        <a href="{{ url_for('logout') }}" title="Logout"><span class="nav-icon">↪</span><span class="nav-label">Logout</span></a>
+    </div>
+</aside>
+<script nonce="{{ csp_nonce() }}">
+(() => {
+    const body = document.body;
+    const sidebar = document.querySelector('.app-sidebar');
+    const toggle = document.getElementById('sidebar-toggle');
+    body.classList.add('app-shell-page');
+    const collapsed = localStorage.getItem('label-check-sidebar-collapsed') === 'true';
+    body.classList.toggle('sidebar-collapsed', collapsed);
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    toggle.textContent = collapsed ? '›' : '‹';
+    toggle.addEventListener('click', () => {
+        const next = !body.classList.contains('sidebar-collapsed');
+        body.classList.toggle('sidebar-collapsed', next);
+        localStorage.setItem('label-check-sidebar-collapsed', String(next));
+        toggle.setAttribute('aria-expanded', String(!next));
+        toggle.textContent = next ? '›' : '‹';
+    });
+
+    let lastActivity = Date.now();
+    const markActive = () => { lastActivity = Date.now(); };
+    ['keydown', 'pointermove', 'pointerdown', 'touchstart', 'scroll'].forEach(eventName =>
+        window.addEventListener(eventName, markActive, {passive: true})
+    );
+    window.setInterval(() => {
+        if (document.visibilityState !== 'visible' || Date.now() - lastActivity > 300000) return;
+        fetch('{{ url_for("statistics_heartbeat") }}', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {'X-CSRF-Token': '{{ csrf_token() }}'}
+        }).then(response => response.ok ? response.json() : null)
+          .then(data => {
+              if (data && data.statistics) window.dispatchEvent(
+                  new CustomEvent('statistics-update', {detail: data.statistics})
+              );
+          }).catch(() => {});
+    }, 60000);
+})();
+</script>

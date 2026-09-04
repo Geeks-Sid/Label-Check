@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVS Slide QC</title>
+    <style nonce="{{ csp_nonce() }}">
+        :root {
+            --primary-color: #007bff;
+            --primary-dark: #0056b3;
+            --secondary-color: #6c757d;
+            --secondary-dark: #5a6268;
+            --success-color: #28a745;
+            --success-dark: #218838;
+            --info-color: #17a2b8;
+            --info-dark: #138496;
+            --warning-color: #ffc107;
+            --warning-dark: #e0a800;
+            --danger-color: #dc3545;
+            --danger-dark: #c82333;
+            --light-bg: #f8f9fa;
+            --dark-bg: #e9ecef;
+            --text-color: #343a40;
+            --border-color: #dee2e6;
+            --card-bg: #ffffff;
+            --shadow: rgba(0, 0, 0, 0.08);
+        }
+
+        /* --- Modernized Look & Feel --- */
+        body {
+            font-family: system-ui, sans-serif;
+            background-color: var(--light-bg);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            color: var(--text-color);
+        }
+
+        /* HEADER */
+        .header {
+            background: linear-gradient(90deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 10px var(--shadow);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+
+        .header-links {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap; /* Allow wrapping */
+            gap: 15px; /* Spacing between links */
+            margin-top: 5px; /* Adjust for wrap */
+        }
+
+        .header-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s ease-in-out;
+            padding: 6px 12px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 5px;
+        }
+
+        .header-links a:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .header-links span {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content-wrapper {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden; /* Prevent inner scrollbars from affecting main layout */
+            padding: 20px;
+            gap: 20px;
+        }
+
+        /* PANELS */
+        .left-panel {
+            flex: 1;
+            padding: 25px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 6px 16px var(--shadow);
+            overflow-y: auto; /* Enable scrolling for content within this panel */
+            min-width: 350px; /* Ensure panel doesn't get too small */
+        }
+
+        .right-panel {
+            flex: 2;
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--dark-bg);
+            border-radius: 12px;
+            box-shadow: 0 6px 16px var(--shadow);
+            overflow: hidden; /* Hide overflow for image sizing */
+        }
+
+        .image-container {
+            display: flex;
+            justify-content: center;
+            align-items: stretch; /* CRITICAL: Make columns equal height */
+            gap: 30px;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* IMAGE BOXES */
+        .image-box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px var(--shadow);
+            text-align: center;
+            flex-basis: calc(50% - 30px);
+            box-sizing: border-box;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center; /* CRITICAL: Center content vertically */
+        }
+
+        .image-box img {
+            max-width: 100%;
+            max-height: 65vh; /* Use viewport height for responsive sizing */
+            width: auto;
+            height: auto;
+            display: block;
+            border-radius: 4px;
+            object-fit: contain;
+        }
+
+        .image-box p {
+            margin-top: 15px; /* More space between image and text */
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--secondary-color);
+        }
+
+        /* Specific styles for the rotated macro image */
+        .image-box.macro-image-box img {
+            transform: rotate(90deg);
+            /* For a rotated image, max-width effectively controls the new height */
+            max-width: 60vh;
+        }
+
+        .image-box:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px var(--shadow);
+        }
+
+        .form-section {
+            width: 100%;
+            margin-top: 25px;
+        }
+
+        /* FORMS */
+        form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: var(--text-color);
+            font-size: 0.95em;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="number"],
+        .form-group textarea {
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            padding: 10px 12px;
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 0.95rem;
+            background: #fff;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .form-group input[type="text"]:focus,
+        .form-group input[type="number"]:focus,
+        .form-group textarea:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+            outline: none;
+        }
+
+        .form-group p {
+            background-color: var(--light-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 10px 12px;
+            margin: 0;
+            min-height: 40px; /* Ensure consistent height */
+            word-wrap: break-word; /* Wrap long text */
+        }
+
+        .form-check {
+            grid-column: 1 / -1; /* Span full width */
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .form-check input[type="checkbox"] {
+            margin-right: 10px;
+            transform: scale(1.2); /* Make checkbox slightly larger */
+            cursor: pointer;
+        }
+
+        .form-check label {
+            margin-bottom: 0; /* Override default label margin */
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .form-actions {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        /* BUTTONS */
+        .form-actions button {
+            border-radius: 8px;
+            font-size: 0.95rem;
+            padding: 10px 16px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            white-space: nowrap; /* Prevent button text from wrapping */
+        }
+
+        .form-actions button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px var(--shadow);
+        }
+
+        .form-actions button.nav-btn {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .form-actions button.nav-btn:hover {
+            background-color: var(--success-dark);
+        }
+
+        .form-actions button.save-btn {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .form-actions button.save-btn:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .form-actions button.filter-btn {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .form-actions button.filter-btn:hover {
+            background-color: var(--secondary-dark);
+        }
+
+        .form-actions .jump-input,
+        .form-actions .search-input {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: nowrap; /* Keep input and button on one line */
+        }
+
+        .form-actions .jump-input input,
+        .form-actions .search-input input {
+            width: 100px; /* Fixed width for jump/search input */
+        }
+
+        .form-actions .jump-input button,
+        .form-actions .search-input button {
+            background-color: var(--info-color);
+            color: white;
+            padding: 10px 15px; /* Slightly smaller padding for these buttons */
+        }
+
+        .form-actions .jump-input button:hover,
+        .form-actions .search-input button:hover {
+            background-color: var(--info-dark);
+        }
+
+        .flash-messages {
+            list-style-type: none;
+            padding: 0;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        /* FLASH MESSAGES */
+        .flash-messages li {
+            border-radius: 8px;
+            font-size: 0.9rem;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            font-weight: 500;
+            border: 1px solid transparent; /* Base border */
+        }
+
+        .flash-messages li.info {
+            background-color: #e0f7fa; /* Light cyan */
+            color: #007bb6; /* Darker blue */
+            border-color: #00acc1; /* Cyan */
+        }
+
+        .flash-messages li.warning {
+            background-color: #fffde7; /* Light yellow */
+            color: #c58600; /* Darker orange */
+            border-color: #ffeb3b; /* Yellow */
+        }
+
+        .flash-messages li.error {
+            background-color: #ffebee; /* Light red */
+            color: #d32f2f; /* Darker red */
+            border-color: #f44336; /* Red */
+        }
+
+        .flash-messages li.success {
+            background-color: #e8f5e9; /* Light green */
+            color: #2e7d32; /* Darker green */
+            border-color: #4caf50; /* Green */
+        }
+
+        .flash-messages li.flash-critical {
+            background-color: #ffcdd2; /* Even lighter red */
+            color: #b71c1c; /* Even darker red */
+            border-color: #e53935; /* Strong red */
+            font-weight: bold;
+            animation: shake 0.5s; /* Add a shake animation for critical errors */
+        }
+
+        /* QUEUE INFO */
+        .queue-info {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 1rem;
+            color: var(--text-color);
+            margin-bottom: 20px;
+            line-height: 1.5;
+            text-align: center;
+        }
+        .queue-info.complete { border-left: 5px solid var(--success-color); }
+        .queue-info.warning { border-left: 5px solid var(--warning-color); }
+        .queue-detail { font-size: 0.85rem; color: var(--secondary-color); }
+        .form-actions .release-button { background-color: var(--warning-color); }
+        .error-message { color: var(--danger-color); font-weight: bold; margin-top: 15px; }
+
+        .queue-info span {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        .no-data-message {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: var(--secondary-color);
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px var(--shadow);
+            margin: 20px;
+        }
+
+        .no-data-message a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .no-data-message a:hover {
+            text-decoration: underline;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 992px) {
+            .content-wrapper {
+                flex-direction: column;
+                padding: 15px;
+                gap: 15px;
+            }
+
+            .left-panel, .right-panel {
+                min-width: unset; /* Remove min-width on smaller screens */
+                width: 100%;
+                padding: 20px;
+            }
+
+            .image-box {
+                flex-basis: 100%; /* Stack images vertically on smaller screens */
+            }
+
+            form {
+                grid-template-columns: 1fr; /* Stack form fields vertically */
+            }
+
+            .form-actions {
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch; /* Stretch buttons to full width */
+            }
+
+            .form-actions button,
+            .form-actions .jump-input,
+            .form-actions .search-input {
+                width: 100%;
+                justify-content: center; /* Center content within these actions */
+            }
+
+            .form-actions .jump-input input,
+            .form-actions .search-input input {
+                width: auto; /* Auto width for inputs within flexible containers */
+                flex-grow: 1; /* Allow input to grow */
+            }
+
+            .header-links {
+                justify-content: center;
+                width: 100%; /* Ensure links take full width for wrapping */
+            }
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        .recently-completed {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 6px 16px var(--shadow);
+        }
+
+        .recently-completed h3 {
+            margin-top: 0;
+        }
+
+        .recently-completed ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .recently-completed li {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .recently-completed li:last-child {
+            border-bottom: none;
+        }
+
+        .recently-completed a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .recently-completed .completed-time {
+            font-size: 0.85rem;
+            color: var(--secondary-color);
+        }
+
+    </style>
+</head>
+<body>
+{% include '_app_sidebar.html' %}
+    <div class="header">
+        <h1>SVS Slide Quality Control — {{ batch_name }}</h1>
+        <div class="header-links">
+            {% if current_user.is_authenticated %}
+                <a href="{{ url_for('index') }}">Menu</a>
+                <a href="{{ url_for('qc', choose=1) }}">Change Batch</a>
+                <a href="{{ url_for('history', batch=batch_id) }}">My History</a>
+                {% if current_user.is_admin %}
+                    <a href="{{ url_for('users_management') }}">User Management</a>
+                {% endif %}
+                <span>Logged in as <b>{{ current_user.id }}</b> (Slides Completed: {{ current_user.slides_completed }})</span>
+                <a href="{{ url_for('logout') }}">Logout</a>
+            {% endif %}
+        </div>
+    </div>
+    <main class="content-wrapper">
+        <div class="left-panel">
+            <ul class="flash-messages">
+                {% for message in messages %}
+                    <li class="{{ message.category }}">{{ message.message }}</li>
+                {% endfor %}
+                {% for warning in discovery_warnings %}
+                    <li class="warning">{{ warning }}</li>
+                {% endfor %}
+            </ul>
+
+            {% if no_items_available %}
+                <div class="no-data-message">
+                    <h2>No items are currently available</h2>
+                    <p>The remaining items are leased by other users. Try again shortly or choose another batch.</p>
+                    <p>
+                        <b>{{ completed_count }}</b> of <b>{{ total_count }}</b> items are complete.
+                    </p>
+                    <p><a href="{{ url_for('qc', batch=batch_id) }}">Refresh this batch</a></p>
+                </div>
+            {% elif data_loaded %}
+                <div class="queue-info">
+                    <h3>Queue Status</h3>
+                    <p>
+                        Pending: <span>{{ queue_stats.pending }}</span> |
+                        Leased: <span>{{ queue_stats.leased }}</span> |
+                        Completed: <span>{{ queue_stats.completed }}</span>
+                    </p>
+                </div>
+
+                {% if lease_info and lease_info.leased_by_id == current_user.id %}
+                    <div class="queue-info complete">
+                        <p>
+                            You have leased item with Accession ID: <b>{{ row.AccessionID }}</b>.
+                        </p>
+                        <p class="queue-detail">
+                            This lease will expire in approximately {{ (lease_info.leased_at + timedelta(seconds=config.LEASE_DURATION_SECONDS) - datetime.utcnow()).seconds // 60 }} minutes.
+                        </p>
+                    </div>
+                {% elif lease_info %}
+                    <div class="queue-info warning">
+                        <p>
+                            Item with Accession ID: <b>{{ row.AccessionID }}</b> is currently leased by <b>{{ lease_info.leased_by.id }}</b>.
+                        </p>
+                        <p>You are viewing in read-only mode.</p>
+                    </div>
+                {% endif %}
+
+
+                <form action="{{ url_for('update') }}" method="POST" class="form-section">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="batch" value="{{ batch_id }}">
+                    <input type="hidden" name="original_index" value="{{ original_index }}">
+
+                    <div class="form-group">
+                        <label for="accession_id">Accession ID:</label>
+                        <input type="text" id="accession_id" name="accession_id" value="{{ row.AccessionID }}" required {% if lease_info.leased_by_id != current_user.id %}readonly{% endif %}>
+                    </div>
+
+                    <!-- NEW: Display for the auto-calculated count -->
+                    <div class="form-group">
+                        <label>Accession ID Count:</label>
+                        <p>
+                            <strong>{{ row._accession_id_count if row._accession_id_count is not none else 0 }}</strong> 
+                        </p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="stain">Stain ($):</label>
+                        <input type="text" id="stain" name="stain" value="{{ row.Stain }}" pattern="[A-Z0-9-]+" title="Use uppercase letters, numbers, and hyphens only. Underscores are automatically converted to hyphens." required {% if lease_info.leased_by_id != current_user.id %}readonly{% endif %}>
+                    </div>
+
+                    <!-- NEW: Input field for Block Number -->
+                    <div class="form-group">
+                        <label for="block_number">Block Number (#):</label>
+                        <input type="text" id="block_number" name="block_number" value="{{ row.BlockNumber }}" pattern="[A-Z0-9-]+" title="Use uppercase letters, numbers, and hyphens only." required {% if lease_info.leased_by_id != current_user.id %}readonly{% endif %}>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Original Label Text:</label>
+                        <p>{{ row._label_text }}</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Original Macro Text:</label>
+                        <p>{{ row._macro_text }}</p>
+                    </div>
+
+                    <div class="form-group form-check">
+                        <input type="checkbox" id="complete" name="complete" {% if row._is_complete %}checked{% endif %} {% if lease_info.leased_by_id != current_user.id %}disabled{% endif %}>
+                        <label for="complete">Mark as Complete</label>
+                    </div>
+
+                    <div class="form-actions">
+                        {% if lease_info.leased_by_id == current_user.id %}
+                            <button type="submit" name="action" value="next" class="nav-btn">Save and Next</button>
+                            <button type="submit" formaction="{{ url_for('release_lease') }}" formmethod="POST" class="nav-btn release-button">Release Lease</button>
+                        {% else %}
+                             <a href="{{ url_for('qc', batch=batch_id) }}" class="nav-btn">Get Next Available Item</a>
+                        {% endif %}
+                    </div>
+                </form>
+                
+                <div class="recently-completed">
+                    <h3>Recently Completed</h3>
+                    {% if recently_completed %}
+                        <ul>
+                            {% for item in recently_completed %}
+                                <li>
+                                    <a href="{{ url_for('qc', batch=batch_id, index=item.original_index) }}">{{ item.accession_id }}</a>
+                                    <span class="completed-time">{{ item.completed_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>You have not completed any items yet.</p>
+                    {% endif %}
+                </div>
+
+            {% else %}
+                <div class="no-data-message">
+                    <p>No data loaded or available.</p>
+                    {% if error_message %}
+                        <p class="error-message">{{ error_message }}</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="right-panel">
+            <div class="image-container">
+                <div class="image-box">
+                    {% if label_img_exists %}
+                        <img src="{{ label_img_path }}" alt="Label Image">
+                        <p>Label Image</p>
+                    {% else %}
+                        <p>Label Image Not Found</p>
+                    {% endif %}
+                </div>
+                <div class="image-box macro-image-box">
+                    {% if macro_img_exists %}
+                        <img src="{{ macro_img_path }}" alt="Macro Image">
+                        <p>Macro Image</p>
+                    {% else %}
+                        <p>Macro Image Not Found</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </main>
+    <script nonce="{{ csp_nonce() }}">
+        document.addEventListener('DOMContentLoaded', function() {
+            const completeCheckbox = document.getElementById('complete');
+            const nextButton = document.querySelector('button[name="action"][value="next"]');
+
+            function toggleNextButtonState() {
+                if (nextButton) {
+                    // Disable the 'Next' button if the 'Mark as Complete' checkbox is not checked
+                    nextButton.disabled = !completeCheckbox.checked;
+                }
+            }
+
+            if (completeCheckbox && nextButton) {
+                // Set the initial state of the 'Next' button when the page loads
+                toggleNextButtonState();
+
+                // Add a listener to the checkbox to toggle the button state whenever it changes
+                completeCheckbox.addEventListener('change', toggleNextButtonState);
+            }
+
+            const accessionInput = document.getElementById('accession_id');
+            const stainInput = document.getElementById('stain');
+            const blockInput = document.getElementById('block_number');
+
+            function normalizeInput(input) {
+                const selectionStart = input.selectionStart;
+                const selectionEnd = input.selectionEnd;
+                let normalized = input.value.toUpperCase();
+                if (input === stainInput) normalized = normalized.replace(/_/g, '-');
+                input.value = normalized;
+                input.setSelectionRange(selectionStart, selectionEnd);
+            }
+
+            [stainInput, blockInput].forEach(input => {
+                if (!input || input.readOnly) return;
+                normalizeInput(input);
+                input.addEventListener('input', () => normalizeInput(input));
+            });
+
+            // Auto-focus: first empty editable field, or "Mark as Complete" if all fields are filled
+            const editableFields = ['accession_id', 'stain', 'block_number']
+                .map(id => document.getElementById(id))
+                .filter(el => el && !el.readOnly);
+            const firstEmpty = editableFields.find(el => el.value.trim() === '');
+            if (firstEmpty) {
+                firstEmpty.focus();
+            } else if (completeCheckbox && !completeCheckbox.disabled) {
+                completeCheckbox.focus();
+            }
+        });
+    </script>
+</body>
+</html>

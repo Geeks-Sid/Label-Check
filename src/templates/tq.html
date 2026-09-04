@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transfers - Label Check</title>
+    <style nonce="{{ csp_nonce() }}">
+        :root { --primary:#007bff; --primary-dark:#0056b3; --bg:#f7f9fb; --text:#27313d; --muted:#687482; --border:#dce2e8; --success:#218838; --danger:#b42318; }
+        * { box-sizing:border-box; }
+        body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font-family:Arial,sans-serif; }
+        header { display:flex; justify-content:space-between; align-items:center; gap:18px; padding:15px 30px; color:white; background:linear-gradient(90deg,var(--primary),var(--primary-dark)); }
+        header h1 { margin:0; font-size:1.5rem; }
+        header nav { display:flex; align-items:center; flex-wrap:wrap; gap:14px; }
+        header a { color:white; text-decoration:none; }
+        main { width:min(1400px,calc(100% - 36px)); margin:28px auto 50px; }
+        .card { margin-bottom:20px; padding:22px; border:1px solid var(--border); border-radius:10px; background:white; box-shadow:0 4px 14px rgba(0,0,0,.05); }
+        h2 { margin-top:0; }
+        .controls { display:grid; grid-template-columns:repeat(4,minmax(150px,1fr)); gap:14px; align-items:end; }
+        .field { display:flex; flex-direction:column; gap:6px; }
+        .field label,.field-label { font-size:.84rem; font-weight:700; }
+        input,select,button { font:inherit; }
+        input,select { width:100%; padding:9px 10px; border:1px solid #aeb8c3; border-radius:6px; background:white; }
+        button,.button-link { display:inline-block; padding:9px 15px; border:0; border-radius:6px; color:white; background:var(--primary); cursor:pointer; text-decoration:none; font-weight:700; }
+        button.secondary,.button-link.secondary { background:#667085; }
+        button.danger { background:var(--danger); }
+        button:disabled { opacity:.55; cursor:not-allowed; }
+        .actions { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:16px; }
+        .destination-fields { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .review-actions { margin:0 0 15px; }
+        .review-filter { flex:1 1 360px; }
+        .messages { padding:0; list-style:none; }
+        .messages li,.notice { margin-bottom:10px; padding:11px 14px; border:1px solid #ffe69c; border-radius:7px; background:#fff3cd; }
+        .messages .error,.notice.error { border-color:#f1aeb5; background:#f8d7da; }
+        .messages .success { border-color:#a3cfbb; background:#d1e7dd; }
+        .muted { color:var(--muted); }
+        .result-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+        details.group { margin:9px 0; border:1px solid var(--border); border-radius:8px; background:#fff; }
+        details.group > summary { display:flex; align-items:center; gap:10px; padding:12px; cursor:pointer; font-weight:700; list-style:none; }
+        details.group > summary::-webkit-details-marker { display:none; }
+        details.group > summary::before { content:"▶"; width:14px; color:var(--muted); }
+        details.group[open] > summary::before { content:"▼"; }
+        summary input { width:auto; }
+        .summary-meta { margin-left:auto; color:var(--muted); font-size:.85rem; font-weight:400; }
+        .nested { padding:0 12px 12px 30px; }
+        .slide-row { display:grid; grid-template-columns:32px minmax(180px,1fr) minmax(220px,1.5fr) 100px 100px 130px; gap:10px; align-items:center; padding:10px 12px; border-top:1px solid var(--border); }
+        .slide-row input { width:auto; }
+        .slide-name,.path { overflow-wrap:anywhere; }
+        .path { color:var(--muted); font-family:ui-monospace,Consolas,monospace; font-size:.8rem; }
+        .table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:8px; }
+        table { width:100%; border-collapse:collapse; background:white; }
+        th,td { padding:11px 10px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; }
+        th { background:#eef2f6; font-size:.84rem; }
+        td code { overflow-wrap:anywhere; white-space:normal; }
+        .review-table { min-width:1100px; }
+        .destination { display:grid; grid-template-columns:minmax(160px,1fr) auto; gap:6px; align-items:center; }
+        .suffix { color:var(--muted); font-family:ui-monospace,Consolas,monospace; font-size:.82rem; white-space:nowrap; }
+        .status { padding:5px 10px; border-radius:999px; background:#e8eef5; font-size:.78rem; font-weight:700; text-transform:uppercase; }
+        .status.running { color:#795b00; background:#fff3cd; }
+        .status.succeeded { color:#155724; background:#d4edda; }
+        .status.failed { color:#721c24; background:#f8d7da; }
+        .console-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+        #console { min-height:240px; max-height:520px; overflow:auto; padding:16px; border-radius:8px; color:#e7edf3; background:#111820; white-space:pre-wrap; overflow-wrap:anywhere; font:13px/1.55 ui-monospace,Consolas,monospace; }
+        [hidden] { display:none !important; }
+        @media(max-width:850px) { header{align-items:flex-start;flex-direction:column;padding:15px 20px}.controls{grid-template-columns:1fr 1fr}.slide-row{min-width:900px}.selection-panel{overflow-x:auto} }
+        @media(max-width:560px) { .controls{grid-template-columns:1fr} }
+    </style>
+</head>
+<body>
+{% include '_app_sidebar.html' %}
+<header>
+    <h1>Transfers</h1>
+    <nav>
+        <a href="{{ url_for('index') }}">Home</a>
+        <a href="{{ url_for('tq_logs') }}">Show Logs</a>
+        <span>Logged in as <b>{{ current_user.id }}</b></span>
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </nav>
+</header>
+<main>
+    {% if messages or discovery_warnings %}
+    <ul class="messages">
+        {% for message in messages %}<li class="{{ message.category }}">{{ message.message }}</li>{% endfor %}
+        {% for warning in discovery_warnings %}<li>{{ warning }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+
+    <section class="card">
+        <h2>Schedule a transfer</h2>
+        <form id="selection-controls" method="GET" action="{{ url_for('tq_page') }}">
+            <div class="controls">
+                <div class="field">
+                    <label for="select">Select</label>
+                    <select id="select" name="select">
+                        {% for option in ('Batch','Accession','Slide','Type') %}<option value="{{ option }}" {% if selection_type == option %}selected{% endif %}>{{ option }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="filter">Filter</label>
+                    <select id="filter" name="filter">
+                        {% for option in filter_fields %}<option value="{{ option }}" {% if filter_field == option %}selected{% endif %}>{{ option }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="filter-control field" data-fields="Organ">
+                    <label for="filter-organ">Organ</label>
+                    <select id="filter-organ" data-filter-input>
+                        <option value="">All organs</option>
+                        {% for option in organ_options %}<option value="{{ option }}" {% if filter_value == option %}selected{% endif %}>{{ option }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="filter-control field" data-fields="ImageType">
+                    <label for="filter-image">Image type</label>
+                    <select id="filter-image" data-filter-input>
+                        <option value="">All image types</option>
+                        {% for option in ('WSI','FNA') %}<option value="{{ option }}" {% if filter_value == option %}selected{% endif %}>{{ option }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="filter-control field" data-fields="SampAcqType">
+                    <label for="filter-sample">Sample acquisition type</label>
+                    <select id="filter-sample" data-filter-input>
+                        <option value="">All sample types</option>
+                        {% for option in ('RE','BP') %}<option value="{{ option }}" {% if filter_value == option %}selected{% endif %}>{{ option }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="filter-control field" data-fields="PID">
+                    <label for="filter-pid">PID</label>
+                    <input id="filter-pid" data-filter-input value="{{ filter_value }}" pattern="[A-Za-z]{6}" maxlength="6" placeholder="AAAAAA">
+                </div>
+                <div class="filter-control field" data-fields="SectionCount">
+                    <label for="filter-section">Section count</label>
+                    <input id="filter-section" data-filter-input value="{{ filter_value }}" pattern="[0-9]{3}" maxlength="3" placeholder="000">
+                </div>
+                <div class="filter-control field" data-fields="Stain BlockNumber OriginalPath NewName">
+                    <label for="filter-text">Search value</label>
+                    <input id="filter-text" data-filter-input value="{{ filter_value }}" maxlength="500">
+                </div>
+                <div class="filter-control" data-fields="AccessionDate">
+                    <span class="field-label">Accession date</span>
+                    <div class="destination-fields">
+                        <input type="date" name="start_date" value="{{ start_date }}" aria-label="Start date">
+                        <input type="date" name="end_date" value="{{ end_date }}" aria-label="End date">
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="sort">Sort</label>
+                    <select id="sort" name="sort">
+                        <option value="none" {% if sort_order == 'none' %}selected{% endif %}>None</option>
+                        <option value="az" {% if sort_order == 'az' %}selected{% endif %}>A–Z</option>
+                        <option value="za" {% if sort_order == 'za' %}selected{% endif %}>Z–A</option>
+                        <option value="date" {% if sort_order == 'date' %}selected{% endif %}>Digitization date</option>
+                        <option value="date_reverse" {% if sort_order == 'date_reverse' %}selected{% endif %}>Digitization date reversed</option>
+                    </select>
+                </div>
+            </div>
+            <input id="filter-value" type="hidden" name="filter_value" value="{{ filter_value }}">
+            <div class="actions">
+                <button type="submit">Show slides</button>
+                {% if review %}<a class="button-link secondary" href="{{ url_for('tq_page', view='select') }}">Return to selection</a>{% endif %}
+            </div>
+        </form>
+        {% if filter_error %}<div class="notice error">{{ filter_error }}</div>{% endif %}
+    </section>
+
+    {% if review %}
+    <section class="card">
+        <div class="result-heading">
+            <div><h2>Review transfer</h2><span class="muted">{{ selected_slides|length }} selected slide(s)</span></div>
+            <form method="POST" action="{{ url_for('tq_reset') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="danger" type="submit">Clear draft</button>
+            </form>
+        </div>
+        {% if selected_slides %}
+        <form id="transfer-form" method="POST" action="{{ url_for('tq_transfer') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="actions review-actions">
+                <div class="field review-filter">
+                    <label for="destination-dir">Batch destination directory</label>
+                    <input id="destination-dir" name="destination_dir" value="{{ destination_dir }}" required placeholder="destination" autocomplete="off">
+                    <span class="muted">Slides stage together in D:\image_staging\&lt;destination&gt; before deidentification and upload.</span>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table class="review-table">
+                    <thead><tr><th>Original path</th><th>Destination directory</th><th>Destination name</th><th>Organ</th><th>PID</th><th>Date</th></tr></thead>
+                    <tbody>
+                    {% for slide in selected_slides %}
+                    <tr>
+                        <td><code>{{ slide.original_path }}</code></td>
+                        <td>
+                            <div class="destination">
+                                <code><span class="destination-dir-preview">{{ destination_dir or 'destination' }}</span>/{{ slide.organ }}/{{ slide.pid }}</code>
+                            </div>
+                        </td>
+                        <td><code>{{ slide.destination_name }}</code></td>
+                        <td>{{ slide.organ }}</td><td>{{ slide.pid }}</td><td>{{ slide.digitization_date or 'Unknown' }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="actions">
+                <button type="submit" {% if job and job.status == 'running' %}disabled{% endif %}>Transfer</button>
+                {% if job and job.status == 'running' %}<span class="muted">Another transfer is currently running.</span>{% endif %}
+            </div>
+        </form>
+        {% else %}<p class="muted">The selected slides are no longer available.</p>{% endif %}
+    </section>
+    {% else %}
+    <section class="card selection-panel">
+        <div class="result-heading">
+            <div><h2>Available {{ selection_type|lower }}s</h2><span class="muted">{{ filtered_count }} matching slide(s)</span></div>
+        </div>
+        <form id="review-form" method="POST" action="{{ url_for('tq_review') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if rows %}
+                {% if selection_type == 'Batch' %}
+                    {% for batch in rows %}
+                    <details class="group batch-group">
+                        <summary>
+                            <input class="parent-checkbox" type="checkbox" aria-label="Select batch {{ batch.name }}">
+                            <span>{{ batch.name }}</span>
+                            <span class="summary-meta">{{ batch.accessions|length }} accession(s) · {{ batch.slides|length }} slide(s) · {{ batch.date }}</span>
+                        </summary>
+                        <div class="nested">
+                            {% for accession in batch.accessions %}
+                            <details class="group accession-group">
+                                <summary>
+                                    <input class="parent-checkbox" type="checkbox" aria-label="Select accession {{ accession.name }}">
+                                    <span>{{ accession.name }}</span>
+                                    <span class="summary-meta">{{ accession.slides|length }} slide(s) · {{ accession.date }}</span>
+                                </summary>
+                                <div class="nested">
+                                    {% for slide in accession.slides %}
+                                    <div class="slide-row">
+                                        <input class="slide-checkbox" type="checkbox" name="slide_id" value="{{ slide.id }}" {% if slide.id in selected_ids %}checked{% endif %}>
+                                        <span class="slide-name">{{ slide.destination_name }}</span>
+                                        <span class="path">{{ slide.original_path }}</span>
+                                        <span>{{ slide.organ }}</span><span>{{ slide.pid }}</span><span>{{ slide.digitization_date or 'Unknown' }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </details>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    {% endfor %}
+                {% elif selection_type == 'Accession' %}
+                    {% for accession in rows %}
+                    <details class="group accession-group">
+                        <summary>
+                            <input class="parent-checkbox" type="checkbox" aria-label="Select accession {{ accession.name }}">
+                            <span>{{ accession.name }} <span class="muted">({{ accession.batch_name }})</span></span>
+                            <span class="summary-meta">{{ accession.slides|length }} slide(s) · {{ accession.date }}</span>
+                        </summary>
+                        <div class="nested">
+                            {% for slide in accession.slides %}
+                            <div class="slide-row">
+                                <input class="slide-checkbox" type="checkbox" name="slide_id" value="{{ slide.id }}" {% if slide.id in selected_ids %}checked{% endif %}>
+                                <span class="slide-name">{{ slide.destination_name }}</span>
+                                <span class="path">{{ slide.original_path }}</span>
+                                <span>{{ slide.organ }}</span><span>{{ slide.pid }}</span><span>{{ slide.digitization_date or 'Unknown' }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    {% endfor %}
+                {% elif selection_type == 'Type' %}
+                    {% for type_group in rows %}
+                    <details class="group type-group">
+                        <summary>
+                            <input class="parent-checkbox" type="checkbox" aria-label="Select type {{ type_group.name }}">
+                            <span>{{ type_group.name }}</span>
+                            <span class="summary-meta">{{ type_group.accessions|length }} accession(s) · {{ type_group.slides|length }} slide(s) · {{ type_group.date }}</span>
+                        </summary>
+                        <div class="nested">
+                            {% for accession in type_group.accessions %}
+                            <details class="group accession-group">
+                                <summary>
+                                    <input class="parent-checkbox" type="checkbox" aria-label="Select accession {{ accession.name }}">
+                                    <span>{{ accession.name }} <span class="muted">({{ accession.batch_name }})</span></span>
+                                    <span class="summary-meta">{{ accession.slides|length }} slide(s) · {{ accession.date }}</span>
+                                </summary>
+                                <div class="nested">
+                                    {% for slide in accession.slides %}
+                                    <div class="slide-row">
+                                        <input class="slide-checkbox" type="checkbox" name="slide_id" value="{{ slide.id }}" {% if slide.id in selected_ids %}checked{% endif %}>
+                                        <span class="slide-name">{{ slide.destination_name }}</span>
+                                        <span class="path">{{ slide.original_path }}</span>
+                                        <span>{{ slide.organ }}</span><span>{{ slide.pid }}</span><span>{{ slide.digitization_date or 'Unknown' }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </details>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    {% endfor %}
+                {% else %}
+                    {% for row in rows %}{% set slide = row.slide %}
+                    <div class="slide-row">
+                        <input class="slide-checkbox" type="checkbox" name="slide_id" value="{{ slide.id }}" {% if slide.id in selected_ids %}checked{% endif %}>
+                        <span class="slide-name">{{ slide.destination_name }}</span>
+                        <span class="path">{{ slide.original_path }}</span>
+                        <span>{{ slide.organ }}</span><span>{{ slide.pid }}</span><span>{{ slide.digitization_date or 'Unknown' }}</span>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+                <div class="actions">
+                    <button type="submit">Review Transfer</button>
+                </div>
+            {% else %}<p class="muted">No completed slides match these options.</p>{% endif %}
+        </form>
+    </section>
+    {% endif %}
+
+    {% if job %}
+    <section class="card" aria-live="polite">
+        <div class="console-heading">
+            <h2>Transfer output</h2>
+            <span id="job-status" class="status {{ job.status }}">{{ job.status }}</span>
+        </div>
+        <pre id="console" aria-label="Transfer output"></pre>
+        {% if job.log_path %}<p class="muted">Transfer log: <code>{{ job.log_path }}</code></p>{% endif %}
+    </section>
+    {% endif %}
+</main>
+<script nonce="{{ csp_nonce() }}">
+const csrfToken = {{ csrf_token()|tojson }};
+const filterSelect = document.getElementById('filter');
+const filterValue = document.getElementById('filter-value');
+const filterControls = Array.from(document.querySelectorAll('.filter-control'));
+function updateFilterControl() {
+    const selected = filterSelect.value;
+    let activeInput = null;
+    filterControls.forEach((control) => {
+        const visible = control.dataset.fields.split(' ').includes(selected);
+        control.hidden = !visible;
+        const input = control.querySelector('[data-filter-input]');
+        if (input && visible) activeInput = input;
+    });
+    if (activeInput) filterValue.value = activeInput.value;
+    else if (selected === 'None' || selected === 'AccessionDate') filterValue.value = '';
+}
+filterSelect.addEventListener('change', updateFilterControl);
+document.querySelectorAll('[data-filter-input]').forEach((input) => {
+    input.addEventListener('input', () => { if (!input.closest('[hidden]')) filterValue.value = input.value; });
+    input.addEventListener('change', () => { if (!input.closest('[hidden]')) filterValue.value = input.value; });
+});
+document.getElementById('selection-controls').addEventListener('submit', updateFilterControl);
+updateFilterControl();
+
+function selectedSlideIds() {
+    return Array.from(draftSelectedIds);
+}
+const draftSelectedIds = new Set({{ selected_ids|list|tojson }});
+function captureVisibleSelection() {
+    document.querySelectorAll('.slide-checkbox').forEach((item) => {
+        if (item.checked) draftSelectedIds.add(item.value);
+        else draftSelectedIds.delete(item.value);
+    });
+}
+let draftTimer;
+function saveSelectionDraft() {
+    captureVisibleSelection();
+    window.clearTimeout(draftTimer);
+    draftTimer = window.setTimeout(() => {
+        fetch({{ url_for('tq_save_draft')|tojson }}, {
+            method:'POST',
+            headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken},
+            body:JSON.stringify({selected_ids:selectedSlideIds(),phase:'select'})
+        }).catch(() => {});
+    }, 250);
+}
+function updateParentState(group) {
+    const parent = group.querySelector(':scope > summary .parent-checkbox');
+    if (!parent) return;
+    const children = Array.from(group.querySelectorAll('.slide-checkbox'));
+    const checked = children.filter((item) => item.checked).length;
+    parent.checked = checked > 0 && checked === children.length;
+    parent.indeterminate = checked > 0 && checked < children.length;
+}
+function updateAllParents() {
+    document.querySelectorAll('.accession-group').forEach(updateParentState);
+    document.querySelectorAll('.batch-group').forEach(updateParentState);
+    document.querySelectorAll('.type-group').forEach(updateParentState);
+}
+function setSlideChecked(slideId, checked) {
+    document.querySelectorAll('.slide-checkbox').forEach((item) => {
+        if (item.value === slideId) item.checked = checked;
+    });
+}
+document.querySelectorAll('.parent-checkbox').forEach((checkbox) => {
+    checkbox.addEventListener('click', (event) => event.stopPropagation());
+    checkbox.addEventListener('change', () => {
+        const group = checkbox.closest('.group');
+        group.querySelectorAll('.slide-checkbox').forEach((child) => {
+            setSlideChecked(child.value, checkbox.checked);
+        });
+        updateAllParents();
+        saveSelectionDraft();
+    });
+});
+document.querySelectorAll('.slide-checkbox').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+        setSlideChecked(checkbox.value, checkbox.checked);
+        updateAllParents();
+        saveSelectionDraft();
+    });
+});
+document.getElementById('review-form')?.addEventListener('submit', () => {
+    captureVisibleSelection();
+    const visible = new Set(Array.from(document.querySelectorAll('.slide-checkbox')).map((item) => item.value));
+    draftSelectedIds.forEach((slideId) => {
+        if (visible.has(slideId)) return;
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'slide_id';
+        input.value = slideId;
+        document.getElementById('review-form').appendChild(input);
+    });
+});
+updateAllParents();
+
+const destinationDir = document.getElementById('destination-dir');
+function saveDestinationDir() {
+    const value = destinationDir.value;
+    document.querySelectorAll('.destination-dir-preview').forEach((preview) => {
+        preview.textContent = value || 'destination';
+    });
+    fetch({{ url_for('tq_save_draft')|tojson }}, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken},
+        body:JSON.stringify({destination_dir:value,phase:'review'})
+    }).catch(() => {});
+}
+destinationDir?.addEventListener('input', saveDestinationDir);
+
+{% if job %}
+const consoleElement = document.getElementById('console');
+const statusElement = document.getElementById('job-status');
+const outputUrl = {{ url_for('tq_job_output', job_id=job.id)|tojson }};
+const reloadWhenComplete = {{ (job.status == 'running')|tojson }};
+let outputOffset = 0;
+let ansiBuffer = '';
+const ansiState = {
+    bold:false, dim:false, italic:false, underline:false,
+    inverse:false, hidden:false, strike:false, foreground:null, background:null
+};
+const ansiColors = [
+    '#000000','#cd3131','#0dbc79','#e5e510','#2472c8','#bc3fbc','#11a8cd','#e5e5e5',
+    '#666666','#f14c4c','#23d18b','#f5f543','#3b8eea','#d670d6','#29b8db','#ffffff'
+];
+function resetAnsiState() {
+    Object.assign(ansiState, {
+        bold:false, dim:false, italic:false, underline:false,
+        inverse:false, hidden:false, strike:false, foreground:null, background:null
+    });
+}
+function ansi256Color(value) {
+    if (value < 16) return ansiColors[value];
+    if (value < 232) {
+        const index = value - 16;
+        const levels = [0,95,135,175,215,255];
+        return `rgb(${levels[Math.floor(index / 36)]},${levels[Math.floor(index / 6) % 6]},${levels[index % 6]})`;
+    }
+    const level = 8 + (value - 232) * 10;
+    return `rgb(${level},${level},${level})`;
+}
+function applyAnsiCodes(parameters) {
+    const codes = (parameters === '' ? [0] : parameters.replaceAll(':',';').split(';').map(
+        (value) => value === '' ? 0 : Number.parseInt(value,10)
+    ));
+    for (let index = 0; index < codes.length; index += 1) {
+        const code = codes[index];
+        if (code === 0) resetAnsiState();
+        else if (code === 1) ansiState.bold = true;
+        else if (code === 2) ansiState.dim = true;
+        else if (code === 3) ansiState.italic = true;
+        else if (code === 4 || code === 21) ansiState.underline = true;
+        else if (code === 7) ansiState.inverse = true;
+        else if (code === 8) ansiState.hidden = true;
+        else if (code === 9) ansiState.strike = true;
+        else if (code === 22) { ansiState.bold = false; ansiState.dim = false; }
+        else if (code === 23) ansiState.italic = false;
+        else if (code === 24) ansiState.underline = false;
+        else if (code === 27) ansiState.inverse = false;
+        else if (code === 28) ansiState.hidden = false;
+        else if (code === 29) ansiState.strike = false;
+        else if (code >= 30 && code <= 37) ansiState.foreground = ansiColors[code - 30];
+        else if (code === 39) ansiState.foreground = null;
+        else if (code >= 40 && code <= 47) ansiState.background = ansiColors[code - 40];
+        else if (code === 49) ansiState.background = null;
+        else if (code >= 90 && code <= 97) ansiState.foreground = ansiColors[code - 90 + 8];
+        else if (code >= 100 && code <= 107) ansiState.background = ansiColors[code - 100 + 8];
+        else if ((code === 38 || code === 48) && codes[index + 1] === 5 && Number.isInteger(codes[index + 2])) {
+            const value = Math.max(0,Math.min(255,codes[index + 2]));
+            ansiState[code === 38 ? 'foreground' : 'background'] = ansi256Color(value);
+            index += 2;
+        } else if ((code === 38 || code === 48) && codes[index + 1] === 2 && codes.slice(index + 2,index + 5).every(Number.isInteger)) {
+            const rgb = codes.slice(index + 2,index + 5).map((value) => Math.max(0,Math.min(255,value)));
+            ansiState[code === 38 ? 'foreground' : 'background'] = `rgb(${rgb.join(',')})`;
+            index += 4;
+        }
+    }
+}
+function appendStyledConsoleText(text) {
+    if (!text) return;
+    const span = document.createElement('span');
+    let foreground = ansiState.foreground;
+    let background = ansiState.background;
+    if (ansiState.inverse) {
+        [foreground,background] = [background || '#111820',foreground || '#e7edf3'];
+    }
+    if (foreground) span.style.color = foreground;
+    if (background) span.style.backgroundColor = background;
+    if (ansiState.bold) span.style.fontWeight = '700';
+    if (ansiState.dim) span.style.opacity = '.65';
+    if (ansiState.italic) span.style.fontStyle = 'italic';
+    const decorations = [];
+    if (ansiState.underline) decorations.push('underline');
+    if (ansiState.strike) decorations.push('line-through');
+    if (decorations.length) span.style.textDecoration = decorations.join(' ');
+    if (ansiState.hidden) span.style.visibility = 'hidden';
+    span.textContent = text;
+    consoleElement.appendChild(span);
+}
+function appendAnsiOutput(text) {
+    ansiBuffer += text.replace(/\r(?!\n)/g,'\n');
+    while (ansiBuffer) {
+        const escapeIndex = ansiBuffer.indexOf('\x1b');
+        if (escapeIndex < 0) {
+            appendStyledConsoleText(ansiBuffer);
+            ansiBuffer = '';
+            return;
+        }
+        appendStyledConsoleText(ansiBuffer.slice(0,escapeIndex));
+        ansiBuffer = ansiBuffer.slice(escapeIndex);
+        if (ansiBuffer.length === 1) return;
+        if (ansiBuffer[1] === '[') {
+            let finalIndex = 2;
+            while (finalIndex < ansiBuffer.length) {
+                const character = ansiBuffer.charCodeAt(finalIndex);
+                if (character >= 0x40 && character <= 0x7e) break;
+                finalIndex += 1;
+            }
+            if (finalIndex === ansiBuffer.length) return;
+            if (ansiBuffer[finalIndex] === 'm') {
+                applyAnsiCodes(ansiBuffer.slice(2,finalIndex));
+            }
+            ansiBuffer = ansiBuffer.slice(finalIndex + 1);
+        } else if (ansiBuffer[1] === ']') {
+            const bellIndex = ansiBuffer.indexOf('\x07',2);
+            const terminatorIndex = ansiBuffer.indexOf('\x1b\\',2);
+            let endIndex = bellIndex;
+            let terminatorLength = 1;
+            if (terminatorIndex >= 0 && (endIndex < 0 || terminatorIndex < endIndex)) {
+                endIndex = terminatorIndex;
+                terminatorLength = 2;
+            }
+            if (endIndex < 0) return;
+            ansiBuffer = ansiBuffer.slice(endIndex + terminatorLength);
+        } else {
+            ansiBuffer = ansiBuffer.slice(2);
+        }
+    }
+}
+async function pollOutput() {
+    try {
+        const response = await fetch(`${outputUrl}?offset=${outputOffset}`,{cache:'no-store'});
+        if (!response.ok) throw new Error(`Output request failed (${response.status})`);
+        const data = await response.json();
+        const nearBottom = consoleElement.scrollHeight-consoleElement.scrollTop-consoleElement.clientHeight < 60;
+        if (data.output) appendAnsiOutput(data.output);
+        outputOffset = data.next_offset;
+        statusElement.textContent = data.status;
+        statusElement.className = `status ${data.status}`;
+        if (nearBottom) consoleElement.scrollTop = consoleElement.scrollHeight;
+        if (data.status === 'running') window.setTimeout(pollOutput,750);
+        else if (data.log_path && reloadWhenComplete) window.setTimeout(() => window.location.reload(),500);
+    } catch (error) {
+        appendStyledConsoleText(`\nUnable to refresh output: ${error.message}\n`);
+        window.setTimeout(pollOutput,2000);
+    }
+}
+pollOutput();
+{% endif %}
+</script>
+</body>
+</html>

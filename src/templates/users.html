@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Management - SVS Slide QC</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
+    <style nonce="{{ csp_nonce() }}">
         :root {
             --primary-color: #007bff;
             --primary-dark: #0056b3;
@@ -19,7 +18,7 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: system-ui, sans-serif;
             background-color: var(--light-bg);
             margin: 0;
             padding: 20px;
@@ -206,6 +205,11 @@
             text-decoration: underline;
         }
 
+        .stats-link {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
         @media (max-width: 768px) {
             .header {
                 flex-direction: column;
@@ -236,6 +240,7 @@
     </style>
 </head>
 <body>
+{% include '_app_sidebar.html' %}
     <div class="header">
         <h1>User Management</h1>
         <div class="auth-status">
@@ -254,16 +259,18 @@
             <thead>
                 <tr>
                     <th>Username</th>
-                    <th>Corrections Made</th>
+                    <th>Slides Completed</th>
                     <th>Is Admin</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for user in users %}
                 <tr>
                     <td>{{ user.id }}</td>
-                    <td>{{ user.correction_count }}</td>
+                    <td>{{ user.slides_completed }}</td>
                     <td>{{ 'Yes' if user.is_admin else 'No' }}</td>
+                    <td><a class="stats-link" href="{{ url_for('admin_user_statistics', user_id=user.id) }}">View Stats</a></td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -273,13 +280,15 @@
         <div class="form-section">
             <h2>Add New User</h2>
             <form action="{{ url_for('add_user') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-group">
                     <label for="username">Username:</label>
                     <input type="text" id="username" name="username" required>
                 </div>
                 <div class="form-group">
                     <label for="password">Password:</label>
-                    <input type="password" id="password" name="password" required>
+                    <input type="password" id="password" name="password" minlength="12" maxlength="128" required>
+                    <small>Use 12–128 characters.</small>
                 </div>
                 <div class="form-group">
                     <input type="checkbox" id="is_admin" name="is_admin">
@@ -290,7 +299,7 @@
         </div>
         {% endif %}
 
-        <a href="{{ url_for('index') }}" class="back-link">Back to QC Tool</a>
+        <a href="{{ url_for('qc') }}" class="back-link">Back to QC Tool</a>
     </div>
 </body>
 </html>

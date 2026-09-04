@@ -1,0 +1,14 @@
+.git
+.github
+.env
+.venv
+__pycache__
+*.py[cod]
+*.log
+logs
+src/logs
+src/instance
+src/csv_backups
+tests/__pycache__
+tq/.git
+tq/target

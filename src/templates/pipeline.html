@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Run Label-Check</title>
+    <style nonce="{{ csp_nonce() }}">
+        :root {
+            --primary: #007bff;
+            --primary-dark: #0056b3;
+            --background: #f8f9fa;
+            --card: #fff;
+            --text: #343a40;
+            --muted: #6c757d;
+            --border: #dfe3e7;
+            --success: #218838;
+            --danger: #c82333;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; background: var(--background); color: var(--text); font-family: system-ui, sans-serif; }
+        .header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 15px 30px; color: white; background: linear-gradient(90deg, var(--primary), var(--primary-dark)); }
+        .header h1 { margin: 0; font-size: 1.55rem; }
+        .header nav { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .header a { padding: 6px 12px; border-radius: 5px; color: white; background: rgba(255,255,255,.09); text-decoration: none; }
+        main { width: min(980px, calc(100% - 40px)); margin: 0 auto; padding: 42px 0 60px; }
+        .card { margin-bottom: 24px; padding: 26px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: 0 6px 18px rgba(0,0,0,.07); }
+        h2 { margin: 0 0 8px; }
+        .lead { margin: 0 0 24px; color: var(--muted); }
+        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+        .field { display: flex; flex-direction: column; gap: 7px; }
+        .field.full { grid-column: 1 / -1; }
+        label, legend { font-size: .92rem; font-weight: 600; }
+        input, select { width: 100%; padding: 10px 11px; border: 1px solid #bcc4cc; border-radius: 6px; background: white; color: var(--text); font: inherit; }
+        input:focus, select:focus, summary:focus-visible { outline: 3px solid rgba(0,123,255,.18); border-color: var(--primary); }
+        .help { color: var(--muted); font-size: .8rem; line-height: 1.4; }
+        details { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 18px; }
+        summary { width: fit-content; cursor: pointer; color: var(--primary-dark); font-weight: 600; }
+        .arguments { display: grid; gap: 18px; margin-top: 18px; }
+        fieldset { margin: 0; padding: 18px; border: 1px solid var(--border); border-radius: 8px; }
+        fieldset .grid { margin-top: 12px; }
+        .checkbox { display: flex; flex-direction: row; align-items: center; gap: 9px; min-height: 42px; }
+        .checkbox input { width: auto; }
+        .actions { display: flex; align-items: center; gap: 14px; margin-top: 24px; }
+        button { border: 0; border-radius: 7px; padding: 11px 18px; color: white; background: var(--primary); font: inherit; font-weight: 600; cursor: pointer; }
+        button:hover:not(:disabled) { background: var(--primary-dark); }
+        button:disabled { cursor: not-allowed; opacity: .55; }
+        .busy-note { color: #8a6400; font-size: .88rem; }
+        .flash-messages { padding: 0; margin: 0 0 22px; list-style: none; }
+        .flash-messages li { margin-bottom: 9px; padding: 11px 14px; border-radius: 7px; font-size: .9rem; }
+        .flash-messages .error, .flash-messages .flash-critical { color: #a51d2a; background: #ffebee; border: 1px solid #f5b7bd; }
+        .flash-messages .warning { color: #785900; background: #fff8dc; border: 1px solid #eed889; }
+        .flash-messages .success { color: #1b6629; background: #e8f5e9; border: 1px solid #a8d8ae; }
+        .console-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+        .console-heading h2 { margin: 0; }
+        .status { padding: 5px 10px; border-radius: 999px; background: #e8eef5; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+        .status.running { color: #795b00; background: #fff3cd; }
+        .status.succeeded { color: #155724; background: #d4edda; }
+        .status.failed { color: #721c24; background: #f8d7da; }
+        #console { min-height: 260px; max-height: 520px; overflow: auto; margin: 0; padding: 17px; border-radius: 8px; background: #111820; color: #e7edf3; white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+        @media (max-width: 680px) { .header { align-items: flex-start; flex-direction: column; padding: 15px 20px; } main { width: min(100% - 28px, 980px); padding-top: 28px; } .card { padding: 20px; } .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+{% include '_app_sidebar.html' %}
+    <header class="header">
+        <h1>Run Label-Check</h1>
+        <nav>
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('qc') }}">Quality Control</a>
+            <span>Logged in as <b>{{ current_user.id }}</b></span>
+            <a href="{{ url_for('logout') }}">Logout</a>
+        </nav>
+    </header>
+    <main>
+        {% if messages %}
+            <ul class="flash-messages">
+                {% for message in messages %}<li class="{{ message.category }}">{{ message.message }}</li>{% endfor %}
+            </ul>
+        {% endif %}
+
+        <section class="card">
+            <h2>Pipeline settings</h2>
+            <p class="lead">Enter directories on the server, choose the stages to run, and adjust advanced script arguments if needed.</p>
+            <form method="POST" action="{{ url_for('run_pipeline') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="grid">
+                    <div class="field full">
+                        <label for="input_dir">Input directory</label>
+                        <input id="input_dir" name="input_dir" type="text" value="{{ form_values.input_dir }}" required placeholder="/path/to/input">
+                        <span class="help">An existing directory containing slides or label/macro image folders.</span>
+                    </div>
+                    <div class="field full">
+                        <label for="output_dir">Output directory</label>
+                        <input id="output_dir" name="output_dir" type="text" value="{{ form_values.output_dir }}" required placeholder="/path/to/output">
+                        <span class="help">Pipeline CSV files and extracted images will be written here.</span>
+                    </div>
+                </div>
+
+                <details {% if messages and request.method == 'POST' %}open{% endif %}>
+                    <summary>View other arguments</summary>
+                    <div class="arguments">
+                      <fieldset>
+                          <legend>pipeline.py</legend>
+                          <div class="grid">
+                                <div class="field">
+                                    <label for="start_from">Start from</label>
+                                    <select id="start_from" name="start_from">
+                                        <option value="1" {% if form_values.start_from == '1' %}selected{% endif %}>1: Get macro</option>
+                                        <option value="2" {% if form_values.start_from == '2' %}selected{% endif %}>2: Run dual OCR</option>
+                                        <option value="3" {% if form_values.start_from == '3' %}selected{% endif %}>3: Name files</option>
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label for="end_at">End at</label>
+                                    <select id="end_at" name="end_at">
+                                        <option value="1" {% if form_values.end_at == '1' %}selected{% endif %}>1: Get macro</option>
+                                        <option value="2" {% if form_values.end_at == '2' %}selected{% endif %}>2: Run dual OCR</option>
+                                        <option value="3" {% if form_values.end_at == '3' %}selected{% endif %}>3: Name files</option>
+                                    </select>
+                                </div>
+                           </div>
+                        </fieldset>
+                        <fieldset>
+                            <legend>1_get_macro.py</legend>
+                            <div class="grid">
+                                <div class="field">
+                                    <label for="input_mode">Input mode</label>
+                                    <select id="input_mode" name="input_mode">
+                                        {% for mode in ('auto', 'slides', 'images') %}<option value="{{ mode }}" {% if form_values.input_mode == mode %}selected{% endif %}>{{ mode|capitalize }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label for="macro_workers">Workers</label>
+                                    <input id="macro_workers" name="macro_workers" type="number" min="1" step="1" value="{{ form_values.macro_workers }}" required>
+                                </div>
+                                <div class="field full">
+                                    <label for="macro_extensions">Slide extensions</label>
+                                    <input id="macro_extensions" name="macro_extensions" type="text" value="{{ form_values.macro_extensions }}" required>
+                                    <span class="help">Separate extensions with commas or spaces.</span>
+                                </div>
+                                <div class="field full">
+                                    <label for="macro_image_extensions">Image extensions</label>
+                                    <input id="macro_image_extensions" name="macro_image_extensions" type="text" value="{{ form_values.macro_image_extensions }}" required>
+                                </div>
+                                <div class="field">
+                                    <label for="thumbnail_width">Thumbnail width</label>
+                                    <input id="thumbnail_width" name="thumbnail_width" type="number" min="1" step="1" value="{{ form_values.thumbnail_width }}" required>
+                                </div>
+                                <div class="field">
+                                    <label for="thumbnail_height">Thumbnail height</label>
+                                    <input id="thumbnail_height" name="thumbnail_height" type="number" min="1" step="1" value="{{ form_values.thumbnail_height }}" required>
+                                </div>
+                            </div>
+                        </fieldset>
+                        <fieldset>
+                            <legend>2_run_dual_ocr.py</legend>
+                            <div class="grid">
+                                <div class="field">
+                                    <label for="ocr_workers">Workers</label>
+                                    <input id="ocr_workers" name="ocr_workers" type="number" min="1" step="1" value="{{ form_values.ocr_workers }}" required>
+                                </div>
+                                <label class="checkbox"><input name="ocr_use_cpu" type="checkbox" {% if form_values.ocr_use_cpu == 'on' %}checked{% endif %}> Force EasyOCR to use CPU</label>
+                            </div>
+                        </fieldset>
+                        <fieldset>
+                            <legend>3_name-files.py</legend>
+                            <div class="grid">
+                                <div class="field">
+                                    <label for="naming_workers">Workers</label>
+                                    <input id="naming_workers" name="naming_workers" type="number" min="1" step="1" value="{{ form_values.naming_workers }}" required>
+                                </div>
+                                <div class="field full">
+                                    <label for="naming_accession_pattern">Accession pattern</label>
+                                    <input id="naming_accession_pattern" name="naming_accession_pattern" type="text" value="{{ form_values.naming_accession_pattern }}" required>
+                                    <span class="help">Python regular expression used to identify accession IDs.</span>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </div>
+                </details>
+                <div class="actions">
+                    <button type="submit" {% if pipeline_busy %}disabled{% endif %}>Run Label-Check</button>
+                    {% if pipeline_busy and not job %}<span class="busy-note">Another pipeline is currently running.</span>{% endif %}
+                </div>
+            </form>
+        </section>
+
+        {% if job %}
+            <section class="card" aria-live="polite">
+                <div class="console-heading">
+                    <h2>Pipeline output</h2>
+                    <span id="job-status" class="status {{ job.status }}">{{ job.status }}</span>
+                </div>
+                <pre id="console" aria-label="Pipeline output"></pre>
+            </section>
+        {% endif %}
+    </main>
+
+    <script nonce="{{ csp_nonce() }}">
+        const startSelect = document.getElementById('start_from');
+        const endSelect = document.getElementById('end_at');
+        function updateStageRange() {
+            const start = Number(startSelect.value);
+            for (const option of endSelect.options) option.disabled = Number(option.value) < start;
+            if (Number(endSelect.value) < start) endSelect.value = String(start);
+        }
+        startSelect.addEventListener('change', updateStageRange);
+        updateStageRange();
+
+        {% if job %}
+        const consoleElement = document.getElementById('console');
+        const statusElement = document.getElementById('job-status');
+        const outputUrl = {{ url_for('pipeline_job_output', job_id=job.id)|tojson }};
+        let offset = 0;
+        function cleanConsoleText(value) {
+            return value
+                .replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -\/]*[@-~])/g, '')
+                .replace(/\r(?!\n)/g, '\n');
+        }
+        async function pollOutput() {
+            try {
+                const response = await fetch(`${outputUrl}?offset=${offset}`, {cache: 'no-store'});
+                if (!response.ok) throw new Error(`Output request failed (${response.status})`);
+                const data = await response.json();
+                const nearBottom = consoleElement.scrollHeight - consoleElement.scrollTop - consoleElement.clientHeight < 60;
+                if (data.output) consoleElement.textContent += cleanConsoleText(data.output);
+                offset = data.next_offset;
+                statusElement.textContent = data.status;
+                statusElement.className = `status ${data.status}`;
+                if (nearBottom) consoleElement.scrollTop = consoleElement.scrollHeight;
+                if (data.status === 'running') window.setTimeout(pollOutput, 750);
+            } catch (error) {
+                consoleElement.textContent += `\nUnable to refresh output: ${error.message}\n`;
+                window.setTimeout(pollOutput, 2000);
+            }
+        }
+        pollOutput();
+        {% endif %}
+    </script>
+</body>
+</html>

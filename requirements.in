@@ -1,0 +1,19 @@
+# Direct Linux runtime dependencies. Compile with Python 3.12; do not install directly.
+
+easyocr
+flask
+flask-login
+flask-sqlalchemy
+numpy
+opencv-python
+openpyxl
+openslide-bin
+openslide-python
+pandas
+pillow
+pyodbc
+striprtf
+torch==2.7.1
+torchvision==0.22.1
+tqdm
+waitress

@@ -1,0 +1,4 @@
+[submodule "tq"]
+	path = tq
+	url = https://github.com/gitxandert/tq.git
+	branch = migrate-to-russh

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit TQ Config - Label Check</title>
+    <style nonce="{{ csp_nonce() }}">
+        :root{--primary:#007bff;--primary-dark:#0056b3;--bg:#f7f9fb;--text:#27313d;--border:#dce2e8;--muted:#687482}
+        *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}
+        header{display:flex;justify-content:space-between;align-items:center;padding:15px 30px;color:white;background:linear-gradient(90deg,var(--primary),var(--primary-dark))}
+        header h1{margin:0;font-size:1.5rem}header nav{display:flex;gap:14px}header a{color:white;text-decoration:none}
+        main{width:min(1000px,calc(100% - 36px));margin:28px auto}.card{padding:22px;border:1px solid var(--border);border-radius:10px;background:white;box-shadow:0 4px 14px rgba(0,0,0,.05)}
+        h2{margin-top:0}.path{color:var(--muted);overflow-wrap:anywhere}
+        textarea{width:100%;min-height:520px;padding:15px;border:1px solid #aeb8c3;border-radius:7px;resize:vertical;background:#111820;color:#e7edf3;font:14px/1.55 ui-monospace,Consolas,monospace}
+        button{margin-top:14px;padding:10px 17px;border:0;border-radius:6px;background:var(--primary);color:white;cursor:pointer;font:inherit;font-weight:700}
+        .error,.warning,.success{padding:12px;border:1px solid #f1aeb5;border-radius:7px;background:#f8d7da}.warning{border-color:#ffe69c;background:#fff3cd}.success{border-color:#a3cfbb;background:#d1e7dd}
+        @media(max-width:650px){header{align-items:flex-start;flex-direction:column;gap:10px;padding:15px 20px}}
+    </style>
+</head>
+<body>
+{% include '_app_sidebar.html' %}
+<header><h1>Edit TQ Config</h1><nav><a href="{{ url_for('tq_logs') }}">Logs</a><a href="{{ url_for('tq_page') }}">Transfers</a><a href="{{ url_for('logout') }}">Logout</a></nav></header>
+<main>
+    {% for message in messages %}<p class="{{ message.category }}">{{ message.message }}</p>{% endfor %}
+    <section class="card">
+        <h2>config.toml</h2>
+        <p class="path">{{ config_path }}</p>
+        <form method="POST" action="{{ url_for('tq_edit_config') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <textarea name="config_text" aria-label="TQ configuration" spellcheck="false">{{ config_text }}</textarea>
+            <button type="submit">Save Config</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

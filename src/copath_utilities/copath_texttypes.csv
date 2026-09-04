@@ -1,0 +1,50 @@
+id,name,abbr,active_flag,link_type 
+$addcom,Addendum Comment,ADCOM,A,procedure 
+$adddx,Addendum Diagnosis,ADDX,A,procedure 
+$aprelim-com,Anatomic Preliminary Comment,AOP,A,procedure 
+$aprelim-dx,Anatomic Preliminary Diagnosis,AAP,A,procedure 
+$cardcom,Card Case Comment,CRD,A, 
+$casedis,Case Discussion,CD,A, 
+$clindx,Clinical History,CDX,A,  
+$clinsum,Clinical Summary,CLSUM,A,  
+$confnot,Conference Note,CN,A,  
+$dxcom,Note,DXCOM,A,  
+$final,Final Diagnosis,FI,A, 
+$frodx1,Intraoperative Diagnosis,IOD,A,  
+$frodx2,Intraoperative Diagnosis Detail,IDD,A,frozen 
+$gross,Gross Description,GR,A,  
+$hotseat,Hot Seat Diagnosis,HOT,A,  
+$micro,Microscopic Description,MCR,A,  
+$missing,** MISSING TEXT TYPE -- DO NOT USE! **,GONE,I,  
+$n-dxcom,Neuropathology Diagnosis Comment,ANC,A,procedure 
+$n-final,Neuropathology Final Diagnosis,ANF,A,procedure 
+$n-gross,Neuropathology Gross Description,ANG,A,procedure 
+$n-micro,Neuropathology Microscopic Description,ANM,A,procedure 
+$n-othergross,Neuropathology Other Gross Description,NGD,A,procedure 
+$n-othertxt,Neuropathology Other Text,NOT,A,procedure 
+$nadd-com,Neuropathology Addendum Comment,NAC,A,procedure 
+$nadd-dx,Neuropathology Addendum Diagnosis,NAD,A,procedure 
+$nprelim-com,Neuropathology Preliminary Comment,NPC,A,procedure 
+$nprelim-dx,Neuropathology Preliminary Diagnosis,ANP,A,procedure 
+$othclin,Other Related Clinical Data,ORD,A,  
+$othdx,Other Diagnoses,ODX,A,  
+$othgross,Other Gross Description,OGD,A,  
+$phynot,Physician Notification,PNOTE,A,  
+$postopdx,Post-Operative Diagnosis,POST,A,  
+$prelim-com,Preliminary Comment,PDXCOM,A,procedure 
+$prelim-dx,Preliminary Diagnosis,PDX,A,procedure 
+$preopdx,Pre-Operative Diagnosis,PREOP,A,  
+$procint,Interpretation,INTP,A,procedure 
+$procres,Results-Comments,COMP,A,procedure 
+$review,Cytology Review,CYREV,A,  
+$rptcom,Report Comments,REPCOM,A,  
+$slideblk,Slide-Block Description,SLBL,A,  
+$specialreq,Special Requests,SR,A,  
+$synop,Synoptic Worksheet,SYNOP,A,  
+qeq1,ABN,ABN,A,  
+qeq2,Ancillary Procedures,XAP,A,  
+qeq3,Operative Procedure,XOP,A,  
+qeq4,Postmortem Imaging Studies,XPS,A,  
+qeq5,Procedure Note,PN,A,  
+qeq6,Results,RES,A,  
+,,,,

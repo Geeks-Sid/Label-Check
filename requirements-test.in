@@ -1,0 +1,5 @@
+# Direct dependencies needed by the unit-test environment.
+flask
+flask-login
+openpyxl
+tqdm

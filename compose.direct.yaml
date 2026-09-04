@@ -1,0 +1,18 @@
+services:
+  label-check:
+    environment:
+      COPATH_QUERY_MODE: direct
+      COPATH_CONNECTION_STRING_FILE: /run/secrets/copath_connection_string
+      KRB5_CONFIG: /etc/krb5.conf
+      KRB5CCNAME: /tmp/krb5cc_labelcheck
+    volumes:
+      - type: bind
+        source: ${KRB5_CONFIG_HOST:?Set KRB5_CONFIG_HOST to the domain Kerberos configuration file}
+        target: /etc/krb5.conf
+        read_only: true
+    secrets:
+      - copath_connection_string
+
+secrets:
+  copath_connection_string:
+    file: ${COPATH_CONNECTION_STRING_FILE_HOST:?Set COPATH_CONNECTION_STRING_FILE_HOST}

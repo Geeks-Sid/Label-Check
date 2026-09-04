@@ -1208,22 +1208,26 @@ def main():
         for file in files:
             if file.lower().endswith('.svs'):
                 svs_files.append(os.path.join(root, file))
+    svs_files.sort()
 
     # Step 2: Process each file to remove labels
     with open(mapping_file, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=['original_path', 'anonymized_path', 'status'])
         writer.writeheader()
 
+        failures = 0
         for file_path in svs_files:
             print('Processing', os.path.basename(file_path))
             exit_code = anonymize_slide(file_path, archive_root=archive_root)
             status = 'SUCCESS' if exit_code == 0 else 'FAILURE'
+            failures += int(exit_code != 0)
             # Log the result (note: anonymized_path is same as original_path here
             # since we're modifying in-place, but folder was already renamed)
             writer.writerow({'original_path': file_path, 'anonymized_path': file_path, 'status': status})
 
     print('Anonymization process completed. Results are logged in {}'.format(mapping_file))
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

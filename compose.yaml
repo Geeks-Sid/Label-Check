@@ -1,0 +1,118 @@
+services:
+  label-check:
+    platform: linux/amd64
+    build:
+      context: .
+      target: runtime
+      args:
+        RUST_VERSION: ${RUST_VERSION:-1.95}
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+    image: label-check:${IMAGE_TAG:-latest}
+    environment:
+      TZ: ${TZ:?Set TZ to the server-local IANA timezone}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
+      ADMIN_DEFAULT_PASSWORD: ${ADMIN_DEFAULT_PASSWORD:?Set ADMIN_DEFAULT_PASSWORD}
+      API_REQUIRE_HTTPS: "true"
+      API_TRUST_PROXY_HEADERS: "true"
+      SESSION_COOKIE_SECURE: "true"
+      PIPELINE_INPUT_ROOTS: ${PIPELINE_INPUT_ROOTS:-/data/gt450-images:/data/label-check-batches}
+      PIPELINE_OUTPUT_ROOTS: ${PIPELINE_OUTPUT_ROOTS:-/data/label-check-batches}
+      PIPELINE_MAX_WORKERS: ${PIPELINE_MAX_WORKERS:-8}
+      PIPELINE_MAX_THUMBNAIL_DIMENSION: ${PIPELINE_MAX_THUMBNAIL_DIMENSION:-4096}
+      LOGIN_PAIR_ATTEMPT_LIMIT: ${LOGIN_PAIR_ATTEMPT_LIMIT:-5}
+      LOGIN_ACCOUNT_ATTEMPT_LIMIT: ${LOGIN_ACCOUNT_ATTEMPT_LIMIT:-10}
+      LOGIN_RATE_WINDOW_SECONDS: ${LOGIN_RATE_WINDOW_SECONDS:-900}
+      BATCH_CATALOG_RECONCILE_SECONDS: ${BATCH_CATALOG_RECONCILE_SECONDS:-60}
+      GT450_IMAGES_HOST_PREFIX: ${GT450_IMAGES_HOST_PREFIX:?Set GT450_IMAGES_HOST_PREFIX}
+      LABEL_CHECK_BATCHES_HOST_PREFIX: ${LABEL_CHECK_BATCHES_HOST_PREFIX:-D:\label_check_batches}
+      IMAGE_STAGING_ROOT: /data/image-staging
+      IMAGE_STAGING_HOST_DISPLAY: ${IMAGE_STAGING_HOST:?Set IMAGE_STAGING_HOST}
+      COPATH_QUERY_MODE: ${COPATH_QUERY_MODE:-windows_queue}
+      COPATH_QUERY_QUEUE: ${COPATH_QUERY_QUEUE:-/data/state/copath-query}
+      COPATH_QUERY_TIMEOUT_SECONDS: ${COPATH_QUERY_TIMEOUT_SECONDS:-300}
+      PORT: "5000"
+    expose:
+      - "5000"
+    volumes:
+      - type: volume
+        source: gt450-images
+        target: /data/gt450-images
+        read_only: true
+      - type: bind
+        source: ${SCANNER_INVENTORIES_HOST:?Set SCANNER_INVENTORIES_HOST}
+        target: /data/scanner-inventories
+        read_only: true
+      - type: bind
+        source: ${LABEL_CHECK_BATCHES_HOST:?Set LABEL_CHECK_BATCHES_HOST}
+        target: /data/label-check-batches
+      - type: bind
+        source: ${IMAGE_STAGING_HOST:?Set IMAGE_STAGING_HOST}
+        target: /data/image-staging
+      - type: bind
+        source: ${COPATH_CLONE_HOST:?Set COPATH_CLONE_HOST}
+        target: /data/copath-clone
+      - type: bind
+        source: ${LABEL_CHECK_STATE_HOST:?Set LABEL_CHECK_STATE_HOST}
+        target: /data/state
+      - type: bind
+        source: ${TQ_HOME_HOST:?Set TQ_HOME_HOST}
+        target: /home/labelcheck/.tq
+      - type: bind
+        source: ${SSH_HOME_HOST:?Set SSH_HOME_HOST}
+        target: /home/labelcheck/.ssh
+        read_only: true
+    restart: unless-stopped
+
+  statistics-scheduler:
+    platform: linux/amd64
+    build:
+      context: .
+      target: runtime
+      args:
+        RUST_VERSION: ${RUST_VERSION:-1.95}
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+    image: label-check:${IMAGE_TAG:-latest}
+    command: stats-scheduler
+    environment:
+      TZ: ${TZ:?Set TZ to the server-local IANA timezone}
+      INSTANCE_DIR: /data/state/instance
+    volumes:
+      - type: bind
+        source: ${LABEL_CHECK_STATE_HOST:?Set LABEL_CHECK_STATE_HOST}
+        target: /data/state
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.11.4-alpine
+    environment:
+      LABEL_CHECK_HOSTNAME: ${LABEL_CHECK_HOSTNAME:?Set LABEL_CHECK_HOSTNAME}
+    depends_on:
+      label-check:
+        condition: service_healthy
+    ports:
+      - "443:443"
+    volumes:
+      - type: bind
+        source: ./container/caddy
+        target: /etc/caddy
+        read_only: true
+      - type: volume
+        source: caddy-data
+        target: /data
+      - type: volume
+        source: caddy-config
+        target: /config
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+    name: label-check-caddy-data
+  caddy-config:
+    name: label-check-caddy-config
+  gt450-images:
+    name: label-check-gt450-images
+    driver: local
+    driver_opts:
+      type: cifs
+      device: "//${GT450_SMB_SERVER:?Set GT450_SMB_SERVER}/${GT450_SMB_SHARE:?Set GT450_SMB_SHARE}/${GT450_SMB_SUBDIR:-GT450_Images}"
+      o: "addr=${GT450_SMB_ADDRESS:?Set GT450_SMB_ADDRESS},username=${GT450_SMB_USERNAME:?SetGT450_SMB_USERNAME},password=${GT450_SMB_PASSWORD:?Set GT450_SMB_PASSWORD},domain=${GT450_SMB_DOMAIN:?SetGT450_SMB_DOMAIN},vers=${GT450_SMB_VERSION:-3.1.1},sec=ntlmssp,ro,uid=10001,gid=10001,file_mode=0444,dir_mode=0555,nosharesock"

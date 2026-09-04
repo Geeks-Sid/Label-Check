@@ -1,0 +1,8 @@
+{
+	auto_https disable_redirects
+}
+
+https://{$LABEL_CHECK_HOSTNAME} {
+	tls internal
+	reverse_proxy label-check:5000
+}

@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slide Digitization Log</title>
+    <style nonce="{{ csp_nonce() }}">
+        :root {
+            --primary: #007bff;
+            --primary-dark: #0056b3;
+            --light: #f8f9fa;
+            --border: #dee2e6;
+            --text: #343a40;
+            --muted: #6c757d;
+            --success: #218838;
+            --danger: #c82333;
+            --shadow: rgba(0, 0, 0, 0.08);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            background: var(--light);
+            color: var(--text);
+            font-family: system-ui, sans-serif;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 15px 30px;
+            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+            color: white;
+            box-shadow: 0 4px 10px var(--shadow);
+        }
+
+        .header h1 { margin: 0; font-size: 1.6rem; }
+        .header-links { display: flex; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .header-links a {
+            padding: 6px 12px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
+            font-weight: 500;
+            text-decoration: none;
+        }
+        .header-links a:hover { background: rgba(255, 255, 255, 0.15); }
+
+        main { width: min(1600px, calc(100% - 40px)); margin: 0 auto; padding: 32px 0 50px; }
+        .page-intro { margin-bottom: 24px; }
+        .page-intro h2 { margin: 0 0 8px; }
+        .page-intro p { margin: 0; color: var(--muted); }
+
+        .flash-messages { margin: 0 0 20px; padding: 0; list-style: none; }
+        .flash-messages li {
+            margin-bottom: 10px;
+            padding: 12px 15px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        .flash-messages .success { border-color: #4caf50; background: #e8f5e9; color: #2e7d32; }
+        .flash-messages .error,
+        .flash-messages .flash-critical { border-color: #f44336; background: #ffebee; color: #d32f2f; }
+        .flash-messages .warning { border-color: #ffeb3b; background: #fffde7; color: #9b6900; }
+        .flash-messages .info { border-color: #00acc1; background: #e0f7fa; color: #007bb6; }
+
+        .card {
+            margin-bottom: 28px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 6px 16px var(--shadow);
+        }
+        .card h3 { margin: 0 0 20px; }
+        .error-state { border-left: 5px solid var(--danger); }
+        .error-state p { margin-bottom: 0; }
+
+        form { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 18px; }
+        .form-group { display: flex; flex-direction: column; gap: 7px; }
+        .form-group label { font-size: 0.9rem; font-weight: 600; }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            background: white;
+            color: var(--text);
+            font: inherit;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.2);
+            outline: none;
+        }
+        .form-group.notes { grid-column: span 2; }
+        .form-group textarea { min-height: 86px; resize: vertical; }
+        .required::after { content: " *"; color: var(--danger); }
+        .form-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
+        button, .button-link {
+            display: inline-block;
+            padding: 10px 18px;
+            border: 0;
+            border-radius: 6px;
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+            font: inherit;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        button:hover, .button-link:hover { background: var(--primary-dark); }
+        .button-link.secondary { background: var(--muted); }
+        button.danger { background: var(--danger); }
+        button.danger:hover { background: #a71d2a; }
+
+        .table-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 15px; }
+        .table-heading p { margin: 0; color: var(--muted); }
+        .table-search-form {
+            display: flex;
+            align-items: end;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 16px 0;
+        }
+        .table-search-form label { display: flex; flex: 1 1 320px; flex-direction: column; gap: 6px; font-size: 0.85rem; font-weight: 600; }
+        .table-search-form input,
+        .column-search {
+            min-width: 140px;
+            padding: 8px 10px;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            background: white;
+            color: var(--text);
+            font: inherit;
+        }
+        .table-search-form input:focus,
+        .column-search:focus { border-color: var(--primary); outline: 2px solid rgba(0, 123, 255, 0.18); }
+        .clear-filters { padding: 9px 12px; color: var(--primary-dark); font-weight: 600; }
+        .table-wrapper { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+        table { width: 100%; min-width: 2150px; border-collapse: collapse; background: white; }
+        th, td { padding: 11px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+        th { position: sticky; top: 0; background: #e9ecef; font-size: 0.82rem; white-space: nowrap; }
+        .sort-link { display: inline-flex; align-items: center; gap: 5px; color: var(--text); text-decoration: none; }
+        .sort-link:hover { color: var(--primary-dark); text-decoration: underline; }
+        .sort-indicator { color: var(--primary-dark); }
+        .column-search-row th { top: 38px; padding: 6px; background: #f8f9fa; }
+        .column-search-row .column-search { width: 100%; font-size: 0.8rem; }
+        td { font-size: 0.87rem; }
+        tbody tr:hover { background: #f5f9ff; }
+        tbody tr.editable-row { cursor: pointer; }
+        tbody tr:last-child td { border-bottom: 0; }
+        .status { display: inline-block; min-width: 42px; padding: 3px 7px; border-radius: 999px; text-align: center; font-size: 0.75rem; font-weight: 700; }
+        .status.yes { background: #d4edda; color: #155724; }
+        .status.no { background: #e9ecef; color: #5a6268; }
+        .edit-link { color: var(--primary-dark); font-weight: 600; }
+        .row-actions { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+        .delete-form { display: inline; }
+        .delete-link {
+            padding: 0;
+            background: none;
+            color: var(--danger);
+            font-size: inherit;
+        }
+        .delete-link:hover { background: none; color: #a71d2a; text-decoration: underline; }
+        .empty { padding: 30px; text-align: center; color: var(--muted); }
+
+        @media (max-width: 1100px) { form { grid-template-columns: repeat(2, minmax(180px, 1fr)); } }
+        @media (max-width: 650px) {
+            .header { align-items: flex-start; flex-direction: column; padding: 15px 20px; }
+            main { width: min(100% - 24px, 1600px); padding-top: 24px; }
+            .card { padding: 18px; }
+            form { grid-template-columns: 1fr; }
+            .form-group.notes { grid-column: span 1; }
+            .table-heading { align-items: flex-start; flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+{% include '_app_sidebar.html' %}
+    <header class="header">
+        <h1>Slide Digitization Log</h1>
+        <div class="header-links">
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('qc') }}">Quality Control</a>
+            <span>Logged in as <b>{{ current_user.id }}</b></span>
+            <a href="{{ url_for('logout') }}">Logout</a>
+        </div>
+    </header>
+
+    <main>
+        {% if messages %}
+            <ul class="flash-messages">
+                {% for message in messages %}
+                    <li class="{{ message.category }}">{{ message.message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <div class="page-intro">
+            <h2>Slide batches</h2>
+            <p>Record when slides are loaded or unloaded and review downstream processing status.</p>
+        </div>
+
+        {% if not workbook_available %}
+            <section class="card error-state">
+                <h3>Workbook unavailable</h3>
+                <p>{{ workbook_error }}</p>
+            </section>
+        {% else %}
+            <section class="card" id="entry-form">
+                <h3>{{ 'Edit row ' ~ edit_row if edit_row else 'Add a log entry' }}</h3>
+                <form method="POST" action="{{ url_for('sdl') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="{{ 'update' if edit_row else 'add' }}">
+                    {% if edit_row %}
+                        <input type="hidden" name="worksheet_row" value="{{ edit_row }}">
+                        <input type="hidden" name="row_signature" value="{{ edit_signature }}">
+                    {% endif %}
+
+                    <div class="form-group">
+                        <label class="required" for="accession_id">Accession ID</label>
+                        <input id="accession_id" name="accession_id" value="{{ form_values['Accession ID'] }}" placeholder="A12-123" pattern="[A-Z]{1,3}[0-9]{2}-[0-9]+" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required" for="organ">Organ</label>
+                        <select id="organ" name="organ" required>
+                            <option value="">Select an organ</option>
+                            {% for organ in organ_options %}
+                                <option value="{{ organ }}" {% if form_values['Organ'] == organ %}selected{% endif %}>{{ organ }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="required" for="type">Type</label>
+                        <input id="type" name="type" value="{{ form_values['Type'] }}" placeholder="PROSP, SEMINOMA, TRICHROME..." required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required" for="slides_count">Slides Count</label>
+                        <input type="number" min="1" step="1" id="slides_count" name="slides_count" value="{{ form_values['Slides Count'] }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required" for="scanner">Scanner</label>
+                        <select id="scanner" name="scanner" required>
+                            <option value="">Select a scanner</option>
+                            {% for scanner in scanner_options %}
+                                <option value="{{ scanner }}" {% if form_values['Scanner'] == scanner %}selected{% endif %}>{{ scanner }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="required" for="carousel_rack">Carousel Rack</label>
+                        <input id="carousel_rack" name="carousel_rack" value="{{ form_values['Carousel Rack'] }}" placeholder="1 or 1, 2" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required" for="date_loaded">Date Loaded</label>
+                        <input type="text" id="date_loaded" name="date_loaded" value="{{ form_values['Date Loaded'] }}" placeholder="YYYY-MM-DD or ----------" pattern="(?:[0-9]{4}-[0-9]{2}-[0-9]{2}|----------)" list="sdl-date-options" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required" for="time_loaded">Time Loaded</label>
+                        <input type="time" id="time_loaded" name="time_loaded" value="{{ form_values['Time Loaded'] }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="date_unloaded">Date Unloaded</label>
+                        <input type="text" id="date_unloaded" name="date_unloaded" value="{{ form_values['Date Unloaded'] }}" placeholder="YYYY-MM-DD or ----------" pattern="(?:[0-9]{4}-[0-9]{2}-[0-9]{2}|----------)" list="sdl-date-options">
+                        <datalist id="sdl-date-options">
+                            <option value="----------">
+                        </datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="time_unloaded">Time Unloaded</label>
+                        <input type="time" id="time_unloaded" name="time_unloaded" value="{{ form_values['Time Unloaded'] }}">
+                    </div>
+                    <div class="form-group notes">
+                        <label for="notes">Notes</label>
+                        <textarea id="notes" name="notes" placeholder="Any pertinent information about the slides">{{ form_values['Notes'] }}</textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit">{{ 'Save changes' if edit_row else 'Add entry' }}</button>
+                        {% if edit_row %}
+                            <button
+                                class="danger confirm-delete"
+                                type="submit"
+                                name="delete"
+                                value="1"
+                                formnovalidate
+                            >Delete</button>
+                            <a class="button-link secondary" href="{{ url_for('sdl') }}">Cancel</a>
+                        {% endif %}
+                    </div>
+                </form>
+            </section>
+
+            <section class="card">
+                <div class="table-heading">
+                    <h3>Workbook entries</h3>
+                    <p data-table-count>
+                        {% if rows|length != total_rows %}{{ rows|length }} of {% endif %}
+                        {{ total_rows }} {{ 'entry' if total_rows == 1 else 'entries' }}
+                    </p>
+                </div>
+                {% if total_rows %}
+                    <form class="table-search-form" id="sdl-table-controls" method="GET" action="{{ url_for('sdl') }}">
+                        {% if sort_column is not none %}
+                            <input type="hidden" name="sort" value="{{ sort_column }}">
+                            <input type="hidden" name="direction" value="{{ sort_direction }}">
+                        {% endif %}
+                        <label for="sdl-global-search">
+                            Search entire log
+                            <input id="sdl-global-search" type="search" name="q" value="{{ global_query }}" maxlength="200" placeholder="Search all columns" data-table-search>
+                        </label>
+                        <button type="submit">Search</button>
+                        {% if global_query or column_filters or sort_column is not none %}
+                            <a class="clear-filters" href="{{ url_for('sdl') }}">Clear</a>
+                        {% endif %}
+                    </form>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <a class="sort-link" href="{{ row_sort_url }}">
+                                            Row
+                                            <span class="sort-indicator" aria-label="{{ sort_direction if sort_column == row_sort_column else 'not sorted' }}">
+                                                {% if sort_column == row_sort_column %}{{ '▲' if sort_direction == 'asc' else '▼' }}{% else %}↕{% endif %}
+                                            </span>
+                                        </a>
+                                    </th>
+                                    {% for header in headers %}
+                                        <th>
+                                            <a class="sort-link" href="{{ sort_urls[loop.index0] }}">
+                                                {{ header }}
+                                                <span class="sort-indicator" aria-label="{{ sort_direction if sort_column == loop.index0 else 'not sorted' }}">
+                                                    {% if sort_column == loop.index0 %}{{ '▲' if sort_direction == 'asc' else '▼' }}{% else %}↕{% endif %}
+                                                </span>
+                                            </a>
+                                        </th>
+                                    {% endfor %}
+                                    <th>Actions</th>
+                                </tr>
+                                <tr class="column-search-row">
+                                    <th aria-hidden="true"></th>
+                                    {% for header in headers %}
+                                        <th>
+                                            <input
+                                                class="column-search"
+                                                id="sdl-filter-{{ loop.index0 }}"
+                                                form="sdl-table-controls"
+                                                type="search"
+                                                name="filter_{{ loop.index0 }}"
+                                                value="{{ column_filters.get(loop.index0, '') }}"
+                                                maxlength="200"
+                                                placeholder="Search"
+                                                aria-label="Search {{ header }}"
+                                                data-table-search
+                                            >
+                                        </th>
+                                    {% endfor %}
+                                    <th aria-hidden="true"></th>
+                                </tr>
+                            </thead>
+                            <tbody data-table-body>
+                                {% for row in rows %}
+                                    <tr
+                                        class="editable-row"
+                                        data-edit-url="{{ edit_urls[row.worksheet_row] }}"
+                                        title="Double-click to edit this row"
+                                    >
+                                        <td>{{ row.worksheet_row - 1 }}</td>
+                                        {% for header in headers %}
+                                            <td>
+                                                {% if header in status_headers %}
+                                                    <span class="status {{ 'yes' if row.statuses[header] else 'no' }}">{{ 'Yes' if row.statuses[header] else 'No' }}</span>
+                                                {% else %}
+                                                    {{ row['values'][header] }}
+                                                {% endif %}
+                                            </td>
+                                        {% endfor %}
+                                        <td>
+                                            <div class="row-actions">
+                                                <a class="edit-link" href="{{ edit_urls[row.worksheet_row] }}">Edit</a>
+                                                <form
+                                                    class="delete-form"
+                                                    method="POST"
+                                                    action="{{ url_for('sdl') }}"
+                                                    onsubmit="return confirm('Delete this Slide Digitization Log row? This cannot be undone.');"
+                                                >
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="action" value="delete">
+                                                    <input type="hidden" name="worksheet_row" value="{{ row.worksheet_row }}">
+                                                    <input type="hidden" name="row_signature" value="{{ row.signature }}">
+                                                    <button class="delete-link" type="submit">Delete</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr><td class="empty" colspan="{{ headers|length + 2 }}">No entries match current search.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty">No log entries have been added yet.</div>
+                {% endif %}
+            </section>
+        {% endif %}
+    </main>
+    <script nonce="{{ csp_nonce() }}">
+        let tableSearchTimer;
+        let tableSearchRequest;
+        const tableControls = document.getElementById('sdl-table-controls');
+        document.querySelector('.confirm-delete')?.addEventListener('click', (event) => {
+            if (!window.confirm('Delete this Slide Digitization Log row? This cannot be undone.')) {
+                event.preventDefault();
+            }
+        });
+
+        async function updateTable(targetUrl) {
+            tableSearchRequest?.abort();
+            tableSearchRequest = new AbortController();
+            const url = targetUrl
+                ? new URL(targetUrl, window.location.href)
+                : new URL(tableControls.action, window.location.href);
+            if (!targetUrl) {
+                url.search = new URLSearchParams(new FormData(tableControls)).toString();
+            }
+            try {
+                const response = await fetch(url, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    signal: tableSearchRequest.signal,
+                });
+                if (!response.ok) {
+                    throw new Error(`Search failed with HTTP ${response.status}`);
+                }
+                const nextPage = new DOMParser().parseFromString(
+                    await response.text(),
+                    'text/html',
+                );
+                const nextBody = nextPage.querySelector('[data-table-body]');
+                const nextCount = nextPage.querySelector('[data-table-count]');
+                if (!nextBody || !nextCount) {
+                    window.location.assign(response.url);
+                    return;
+                }
+                document.querySelector('[data-table-body]').innerHTML = nextBody.innerHTML;
+                document.querySelector('[data-table-count]').innerHTML = nextCount.innerHTML;
+                const nextSortLinks = nextPage.querySelectorAll('.sort-link');
+                document.querySelectorAll('.sort-link').forEach((link, index) => {
+                    if (nextSortLinks[index]) {
+                        link.href = nextSortLinks[index].getAttribute('href');
+                        link.innerHTML = nextSortLinks[index].innerHTML;
+                    }
+                });
+                ['sort', 'direction'].forEach((name) => {
+                    tableControls.querySelector(`input[name="${name}"]`)?.remove();
+                    const nextInput = nextPage.querySelector(
+                        `#sdl-table-controls input[name="${name}"]`,
+                    );
+                    if (nextInput) {
+                        tableControls.appendChild(nextInput.cloneNode());
+                    }
+                });
+                window.history.replaceState({}, '', url);
+                attachEditableRows();
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    console.error(error.message);
+                }
+            }
+        }
+
+        tableControls?.addEventListener('submit', (event) => {
+            event.preventDefault();
+            updateTable();
+        });
+        document.querySelectorAll('[data-table-search]').forEach((input) => {
+            input.addEventListener('input', () => {
+                window.clearTimeout(tableSearchTimer);
+                tableSearchTimer = window.setTimeout(updateTable, 400);
+            });
+        });
+        document.querySelectorAll('.sort-link').forEach((link) => {
+            link.addEventListener('click', (event) => {
+                event.preventDefault();
+                updateTable(link.href);
+            });
+        });
+
+        function attachEditableRows() {
+            document.querySelectorAll('tr[data-edit-url]').forEach((row) => {
+                row.addEventListener('dblclick', (event) => {
+                    if (event.target.closest('a, button, input, select, textarea')) {
+                        return;
+                    }
+                    window.location.assign(row.dataset.editUrl);
+                });
+            });
+        }
+
+        attachEditableRows();
+    </script>
+</body>
+</html>

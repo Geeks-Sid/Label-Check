@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Annotation History</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
+    <style nonce="{{ csp_nonce() }}">
         :root {
             --primary-color: #007bff;
             --primary-dark: #0056b3;
@@ -28,7 +27,7 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: system-ui, sans-serif;
             background-color: var(--light-bg);
             margin: 0;
             display: flex;
@@ -141,17 +140,20 @@
     </style>
 </head>
 <body>
+{% include '_app_sidebar.html' %}
     <div class="header">
-        <h1>My Annotation History</h1>
+        <h1>My Annotation History — {{ batch_name }}</h1>
         <div class="header-links">
             <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('qc', batch=batch_id) }}">Quality Control</a>
+            <a href="{{ url_for('qc', choose=1) }}">Change Batch</a>
             {% if current_user.is_authenticated %}
                 <span>Logged in as <b>{{ current_user.id }}</b></span>
                 <a href="{{ url_for('logout') }}">Logout</a>
             {% endif %}
         </div>
     </div>
-    <div class="content-wrapper">
+    <main class="content-wrapper">
         <ul class="flash-messages">
             {% for message in messages %}
                 <li class="{{ message.category }}">{{ message.message }}</li>
@@ -172,7 +174,7 @@
                         <tr>
                             <td>{{ item.accession_id }}</td>
                             <td>{{ item.completed_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</td>
-                            <td><a href="{{ url_for('index', index=item.original_index) }}">View</a></td>
+                            <td><a href="{{ url_for('qc', batch=batch_id, index=item.original_index) }}">View</a></td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -180,6 +182,6 @@
         {% else %}
             <p>You have not completed any items yet.</p>
         {% endif %}
-    </div>
+    </main>
 </body>
 </html>
