@@ -1,4 +1,4 @@
-"""Validated filesystem queue shared by Label-Check and its Windows worker."""
+"""Validated filesystem queue shared by InSlide and its Windows worker."""
 
 from __future__ import annotations
 

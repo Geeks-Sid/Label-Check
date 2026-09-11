@@ -10,7 +10,7 @@ sys.path.insert(0, str(SRC_DIR))
 from container_paths import runtime_path
 
 label_check_batches = Path(
-    os.environ.get("LABEL_CHECK_BATCHES", "D:\\label_check_batches")
+    os.environ.get("INSLIDE_BATCHES", "D:\\label_check_batches")
 )
 scanner_inventories = Path(
     os.environ.get("SCANNER_INVENTORIES", "D:\\scanner_inventories")

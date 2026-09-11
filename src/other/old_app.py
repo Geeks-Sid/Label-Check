@@ -10,10 +10,10 @@ app = Flask(__name__, template_folder='../templates')
 app.secret_key = 'even_more_secret_key_for_robust_session' # MUST be set for session
 
 # --- Configuration ---
-CSV_FILE_PATH = '/Users/siddheshthakur/Work/Projects/Label-Check/2025-07-20/output_processed_latest.csv'
-IMAGE_BASE_DIR = '/Users/siddheshthakur/Work/Projects/Label-Check/2025-07-20'
+CSV_FILE_PATH = '/Users/siddheshthakur/Work/Projects/InSlide/2025-07-20/output_processed_latest.csv'
+IMAGE_BASE_DIR = '/Users/siddheshthakur/Work/Projects/InSlide/2025-07-20'
 BACKUP_DIR = 'csv_backups' # Directory to store backups
-INTERMEDIATE_BACKUP_FILE = r'/Users/siddheshthakur/Work/Projects/Label-Check/2025-07-20/output-ocr-2025-07-20_bkup.csv'
+INTERMEDIATE_BACKUP_FILE = r'/Users/siddheshthakur/Work/Projects/InSlide/2025-07-20/output-ocr-2025-07-20_bkup.csv'
 INTERMEDIATE_BACKUP_FREQUENCY = 10 # Save recovery file every 10 updates
 # --- End Configuration ---
 

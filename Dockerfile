@@ -22,11 +22,11 @@ FROM python:${PYTHON_VERSION}-slim-bookworm AS python-base
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    LABEL_CHECK_CONTAINER=true \
+    INSLIDE_CONTAINER=true \
     EASYOCR_FORCE_CPU=true \
     EASYOCR_MODEL_DIR=/opt/easyocr-models \
-    HOME=/home/labelcheck \
-    TQ_HOME_DIR=/home/labelcheck/.tq
+    HOME=/home/inslide \
+    TQ_HOME_DIR=/home/inslide/.tq
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
@@ -92,11 +92,11 @@ FROM python-base AS runtime
 
 COPY --from=rust-builder /build/tq/target/release/tq /app/bin/tq
 
-RUN groupadd --gid 10001 labelcheck \
-    && useradd --uid 10001 --gid labelcheck --create-home labelcheck \
-    && mkdir -p /data/state/instance /home/labelcheck/.ssh /home/labelcheck/.tq \
+RUN groupadd --gid 10001 inslide \
+    && useradd --uid 10001 --gid inslide --create-home inslide \
+    && mkdir -p /data/state/instance /home/inslide/.ssh /home/inslide/.tq \
     && sha256sum /app/bin/tq > /app/bin/tq.sha256 \
-    && chown -R labelcheck:labelcheck /app /data/state /home/labelcheck \
+    && chown -R inslide:inslide /app /data/state /home/inslide \
     && sh -c '/app/bin/tq >/dev/null 2>&1; test "$?" -eq 1'
 
 ENV TQ_EXECUTABLE=/app/bin/tq \
@@ -104,19 +104,19 @@ ENV TQ_EXECUTABLE=/app/bin/tq \
     SDL_FILE_PATH=/data/state/Slide_Digitization_Log.xlsx \
     BACKUP_DIR=/data/state/csv_backups \
     SCANNER_INVENTORIES=/data/scanner-inventories \
-    LABEL_CHECK_BATCHES=/data/label-check-batches \
+    INSLIDE_BATCHES=/data/inslide-batches \
     IMAGE_STAGING_ROOT=/data/image-staging \
     COPATH_CLONE=/data/copath-clone \
-    TQ_TRANSFER_LOG_DIR=/data/label-check-batches/transfer_logs \
+    TQ_TRANSFER_LOG_DIR=/data/inslide-batches/transfer_logs \
     GT450_IMAGES_CONTAINER_ROOT=/data/gt450-images \
-    LABEL_CHECK_BATCHES_CONTAINER_ROOT=/data/label-check-batches \
+    INSLIDE_BATCHES_CONTAINER_ROOT=/data/inslide-batches \
     COPATH_QUERY_MODE=windows_queue \
     COPATH_QUERY_QUEUE=/data/state/copath-query \
     COPATH_QUERY_TIMEOUT_SECONDS=300 \
     PORT=5000
 
 WORKDIR /app/src
-USER labelcheck
+USER inslide
 EXPOSE 5000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

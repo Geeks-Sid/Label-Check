@@ -30,15 +30,15 @@ class ContainerPathTests(unittest.TestCase):
 
     def test_maps_windows_batch_path(self):
         environment = {
-            "LABEL_CHECK_BATCHES_HOST_PREFIX": r"D:\label_check_batches",
-            "LABEL_CHECK_BATCHES_CONTAINER_ROOT": "/data/label-check-batches",
+            "INSLIDE_BATCHES_HOST_PREFIX": r"D:\label_check_batches",
+            "INSLIDE_BATCHES_CONTAINER_ROOT": "/data/inslide-batches",
         }
         with mock.patch.dict(os.environ, environment, clear=False), mock.patch(
             "container_paths.os.name", "posix"
         ):
             result = runtime_path(r"D:\label_check_batches\SS12797\batch")
 
-        self.assertEqual(Path("/data/label-check-batches/SS12797/batch"), result)
+        self.assertEqual(Path("/data/inslide-batches/SS12797/batch"), result)
 
     def test_leaves_native_path_unchanged(self):
         with mock.patch("container_paths.os.name", "posix"):

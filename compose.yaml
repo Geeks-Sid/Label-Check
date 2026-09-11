@@ -1,5 +1,5 @@
 services:
-  label-check:
+  inslide:
     platform: linux/amd64
     build:
       context: .
@@ -7,7 +7,7 @@ services:
       args:
         RUST_VERSION: ${RUST_VERSION:-1.95}
         PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
-    image: label-check:${IMAGE_TAG:-latest}
+    image: inslide:${IMAGE_TAG:-latest}
     environment:
       TZ: ${TZ:?Set TZ to the server-local IANA timezone}
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
@@ -15,8 +15,8 @@ services:
       API_REQUIRE_HTTPS: "true"
       API_TRUST_PROXY_HEADERS: "true"
       SESSION_COOKIE_SECURE: "true"
-      PIPELINE_INPUT_ROOTS: ${PIPELINE_INPUT_ROOTS:-/data/gt450-images:/data/label-check-batches}
-      PIPELINE_OUTPUT_ROOTS: ${PIPELINE_OUTPUT_ROOTS:-/data/label-check-batches}
+      PIPELINE_INPUT_ROOTS: ${PIPELINE_INPUT_ROOTS:-/data/gt450-images:/data/inslide-batches}
+      PIPELINE_OUTPUT_ROOTS: ${PIPELINE_OUTPUT_ROOTS:-/data/inslide-batches}
       PIPELINE_MAX_WORKERS: ${PIPELINE_MAX_WORKERS:-8}
       PIPELINE_MAX_THUMBNAIL_DIMENSION: ${PIPELINE_MAX_THUMBNAIL_DIMENSION:-4096}
       LOGIN_PAIR_ATTEMPT_LIMIT: ${LOGIN_PAIR_ATTEMPT_LIMIT:-5}
@@ -24,7 +24,7 @@ services:
       LOGIN_RATE_WINDOW_SECONDS: ${LOGIN_RATE_WINDOW_SECONDS:-900}
       BATCH_CATALOG_RECONCILE_SECONDS: ${BATCH_CATALOG_RECONCILE_SECONDS:-60}
       GT450_IMAGES_HOST_PREFIX: ${GT450_IMAGES_HOST_PREFIX:?Set GT450_IMAGES_HOST_PREFIX}
-      LABEL_CHECK_BATCHES_HOST_PREFIX: ${LABEL_CHECK_BATCHES_HOST_PREFIX:-D:\label_check_batches}
+      INSLIDE_BATCHES_HOST_PREFIX: ${INSLIDE_BATCHES_HOST_PREFIX:-D:\label_check_batches}
       IMAGE_STAGING_ROOT: /data/image-staging
       IMAGE_STAGING_HOST_DISPLAY: ${IMAGE_STAGING_HOST:?Set IMAGE_STAGING_HOST}
       COPATH_QUERY_MODE: ${COPATH_QUERY_MODE:-windows_queue}
@@ -43,8 +43,8 @@ services:
         target: /data/scanner-inventories
         read_only: true
       - type: bind
-        source: ${LABEL_CHECK_BATCHES_HOST:?Set LABEL_CHECK_BATCHES_HOST}
-        target: /data/label-check-batches
+        source: ${INSLIDE_BATCHES_HOST:?Set INSLIDE_BATCHES_HOST}
+        target: /data/inslide-batches
       - type: bind
         source: ${IMAGE_STAGING_HOST:?Set IMAGE_STAGING_HOST}
         target: /data/image-staging
@@ -52,14 +52,14 @@ services:
         source: ${COPATH_CLONE_HOST:?Set COPATH_CLONE_HOST}
         target: /data/copath-clone
       - type: bind
-        source: ${LABEL_CHECK_STATE_HOST:?Set LABEL_CHECK_STATE_HOST}
+        source: ${INSLIDE_STATE_HOST:?Set INSLIDE_STATE_HOST}
         target: /data/state
       - type: bind
         source: ${TQ_HOME_HOST:?Set TQ_HOME_HOST}
-        target: /home/labelcheck/.tq
+        target: /home/inslide/.tq
       - type: bind
         source: ${SSH_HOME_HOST:?Set SSH_HOME_HOST}
-        target: /home/labelcheck/.ssh
+        target: /home/inslide/.ssh
         read_only: true
     restart: unless-stopped
 
@@ -71,23 +71,23 @@ services:
       args:
         RUST_VERSION: ${RUST_VERSION:-1.95}
         PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
-    image: label-check:${IMAGE_TAG:-latest}
+    image: inslide:${IMAGE_TAG:-latest}
     command: stats-scheduler
     environment:
       TZ: ${TZ:?Set TZ to the server-local IANA timezone}
       INSTANCE_DIR: /data/state/instance
     volumes:
       - type: bind
-        source: ${LABEL_CHECK_STATE_HOST:?Set LABEL_CHECK_STATE_HOST}
+        source: ${INSLIDE_STATE_HOST:?Set INSLIDE_STATE_HOST}
         target: /data/state
     restart: unless-stopped
 
   caddy:
     image: caddy:2.11.4-alpine
     environment:
-      LABEL_CHECK_HOSTNAME: ${LABEL_CHECK_HOSTNAME:?Set LABEL_CHECK_HOSTNAME}
+      INSLIDE_HOSTNAME: ${INSLIDE_HOSTNAME:?Set INSLIDE_HOSTNAME}
     depends_on:
-      label-check:
+      inslide:
         condition: service_healthy
     ports:
       - "443:443"
@@ -106,11 +106,11 @@ services:
 
 volumes:
   caddy-data:
-    name: label-check-caddy-data
+    name: inslide-caddy-data
   caddy-config:
-    name: label-check-caddy-config
+    name: inslide-caddy-config
   gt450-images:
-    name: label-check-gt450-images
+    name: inslide-gt450-images
     driver: local
     driver_opts:
       type: cifs

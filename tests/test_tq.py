@@ -130,7 +130,7 @@ class TQTransferTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.original_config = {
-            "LABEL_CHECK_BATCHES": app_module.Config.LABEL_CHECK_BATCHES,
+            "INSLIDE_BATCHES": app_module.Config.INSLIDE_BATCHES,
             "INSTANCE_DIR": app_module.Config.INSTANCE_DIR,
             "SDL_FILE_PATH": app_module.Config.SDL_FILE_PATH,
             "TQ_HOME_DIR": app_module.Config.TQ_HOME_DIR,
@@ -141,7 +141,7 @@ class TQTransferTests(unittest.TestCase):
                 app_module.Config.IMAGE_STAGING_HOST_DISPLAY
             ),
         }
-        app_module.Config.LABEL_CHECK_BATCHES = str(self.batch_base)
+        app_module.Config.INSLIDE_BATCHES = str(self.batch_base)
         app_module.Config.INSTANCE_DIR = str(self.root / "instance")
         app_module.batch_contexts.clear()
         catalog_batches, _ = app_module.discover_batches()

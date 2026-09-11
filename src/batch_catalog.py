@@ -1,4 +1,4 @@
-"""SQLite catalog for label-check batches and their QC queues."""
+"""SQLite catalog for Label-Check pipeline batches and their QC queues."""
 
 from __future__ import annotations
 
@@ -143,7 +143,7 @@ class BatchCatalog:
                         os.chmod(path, 0o600)
                     except PermissionError:
                         containerized = os.environ.get(
-                            "LABEL_CHECK_CONTAINER", "false"
+                            "INSLIDE_CONTAINER", "false"
                         ).lower() == "true"
                         if not containerized or not os.access(path, os.R_OK | os.W_OK):
                             raise

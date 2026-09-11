@@ -118,7 +118,7 @@ def require_windows_ticket(connection: str) -> None:
     if result.returncode:
         raise CoPathConfigurationError(
             "No valid Windows Authentication ticket is available. Run "
-            "'docker compose exec label-check kinit YOUR_ACCOUNT@YOUR.AD.REALM', "
+            "'docker compose exec inslide kinit YOUR_ACCOUNT@YOUR.AD.REALM', "
             "then retry CoPath preparation."
         )
 

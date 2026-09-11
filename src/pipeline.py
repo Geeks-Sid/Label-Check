@@ -31,7 +31,7 @@ def parse_except(error: subprocess.CalledProcessError) -> None:
 
 def open_browser_wsl(url: str) -> None:
     """Open a URL using the host browser, including from WSL."""
-    if os.environ.get("LABEL_CHECK_CONTAINER", "false").lower() == "true":
+    if os.environ.get("INSLIDE_CONTAINER", "false").lower() == "true":
         return
     if "microsoft-standard" in platform.uname().release.lower():
         subprocess.run(["powershell.exe", "-Command", f"Start-Process '{url}'"])
@@ -184,7 +184,7 @@ def copy_app_bundle(output_dir: Path) -> Path:
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Pipeline for the modules inside Label-Check. Runs preprocessing stages "
+            "Label-Check pipeline. Runs preprocessing stages "
             "and optionally initializes the QC application."
         )
     )
@@ -256,7 +256,7 @@ def main() -> int:
         return error.returncode or 1
 
     output_src = output_app.parent
-    containerized = os.environ.get("LABEL_CHECK_CONTAINER", "false").lower() == "true"
+    containerized = os.environ.get("INSLIDE_CONTAINER", "false").lower() == "true"
     if not containerized:
         kill_existing_flask()
     print("\n\x1b[1mOpening QC app...\x1b[0m\n", flush=True)

@@ -1,10 +1,10 @@
-# Label-Check
+# InSlide
 A label corrector
 
 ## Pipeline API
 
 The versioned pipeline API is available under `/api/v1` and requires HTTPS plus a
-scoped personal access token. Create a token for an existing Label-Check user:
+scoped personal access token. Create a token for an existing InSlide user:
 
 ```bash
 flask --app src/app.py api-token create USERNAME --label "integration name"
@@ -17,8 +17,8 @@ manage credentials.
 Submit a job using server-visible input and output paths:
 
 ```bash
-curl --request POST https://label-check.example/api/v1/pipeline/jobs \
-  --header "Authorization: Bearer $LABEL_CHECK_TOKEN" \
+curl --request POST https://inslide.example/api/v1/pipeline/jobs \
+  --header "Authorization: Bearer $INSLIDE_TOKEN" \
   --header "Content-Type: application/json" \
   --header "Idempotency-Key: unique-client-request-id" \
   --data '{"input_dir":"/data/incoming","output_dir":"/data/output"}'
@@ -39,8 +39,8 @@ the proxy over plaintext HTTP.
 Pipeline paths are restricted after path translation and symbolic-link
 resolution. `PIPELINE_INPUT_ROOTS` and `PIPELINE_OUTPUT_ROOTS` contain
 platform-path-separator-delimited allowlists. Compose permits input beneath
-`/data/gt450-images` or `/data/label-check-batches` and output beneath
-`/data/label-check-batches`. Worker fields default to a maximum of 8 and
+`/data/gt450-images` or `/data/inslide-batches` and output beneath
+`/data/inslide-batches`. Worker fields default to a maximum of 8 and
 thumbnail dimensions to 4096 pixels; deployments can lower these limits with
 `PIPELINE_MAX_WORKERS` and `PIPELINE_MAX_THUMBNAIL_DIMENSION`.
 
@@ -57,7 +57,7 @@ Cargo nor GCC.
 - Repository cloned with its pinned TQ submodule:
 
   ```powershell
-  git clone --recurse-submodules <label-check-repository-url>
+  git clone --recurse-submodules <inslide-repository-url>
   ```
 
 - Windows directories shared with Docker Desktop.
@@ -79,16 +79,16 @@ Cargo nor GCC.
   network policy.
 
 Copy `.env.example` to `.env`, replace all placeholders, and create the host
-directories. `LABEL_CHECK_STATE_HOST` must contain
+directories. `INSLIDE_STATE_HOST` must contain
 `Slide_Digitization_Log.xlsx` before SDL workflows run.
 
 Batch workflow stages, queues, and leases are stored in
-`LABEL_CHECK_STATE_HOST\instance\batch_catalog.sqlite3`. Batch list pages query
+`INSLIDE_STATE_HOST\instance\batch_catalog.sqlite3`. Batch list pages query
 this catalog and load `enriched.csv` only after a batch is selected. A
 background reconciliation scans for externally-created batches at startup and
 every `BATCH_CATALOG_RECONCILE_SECONDS` seconds (60 by default).
 
-Before the first catalog-aware deployment, stop the Label-Check container and
+Before the first catalog-aware deployment, stop the InSlide container and
 validate legacy state from a PowerShell prompt:
 
 ```powershell
@@ -125,7 +125,7 @@ application when the trusted proxy reports an HTTPS request.
 Compose uses Caddy's internal certificate authority because the organization
 does not supply the deployment certificate. Each authorized client must trust
 the generated root certificate before using the app. Protect and back up the
-`label-check-caddy-data` volume: it contains the local CA private key. Deleting
+`inslide-caddy-data` volume: it contains the local CA private key. Deleting
 that volume creates a new CA and requires every client to trust the replacement.
 
 New user passwords must contain 12–128 characters. Login failures are stored in
@@ -137,7 +137,7 @@ counters. The limits and window are configurable through the corresponding
 Application startup creates runtime directories with mode `0700`, files with
 mode `0600`, and repairs existing instance state before loading it. Symbolic
 links in sensitive instance state are rejected. On Windows bind mounts, NTFS
-ACLs remain the security boundary: restrict `LABEL_CHECK_STATE_HOST` to the
+ACLs remain the security boundary: restrict `INSLIDE_STATE_HOST` to the
 service account, Docker Desktop service account, and administrators.
 
 User activity is accumulated in `/data/state/instance/statistics.sqlite3`.
@@ -152,7 +152,7 @@ out-of-band channel. After verifying it, place the corresponding OpenSSH
 `known_hosts` entry in `${SSH_HOME_HOST}\known_hosts`. `ssh-keyscan` output must
 not be trusted until its fingerprint has been independently verified.
 
-Only Label-Check administrators can view or edit the global TQ connection
+Only InSlide administrators can view or edit the global TQ connection
 configuration. Authenticated operators can continue transferring approved
 slides through that administrator-managed destination.
 
@@ -175,7 +175,7 @@ does not contain the Windows username or password.
 
 ```powershell
 git submodule update --init --recursive
-docker build --target test --tag label-check:test .
+docker build --target test --tag inslide:test .
 docker compose build
 ```
 
@@ -195,7 +195,7 @@ EasyOCR is CPU-only and its English models are baked into the image. Obtain the
 Linux binary hash when needed with:
 
 ```powershell
-docker run --rm --entrypoint sha256sum label-check:latest /app/bin/tq
+docker run --rm --entrypoint sha256sum inslide:latest /app/bin/tq
 ```
 
 ### Paths
@@ -204,7 +204,7 @@ Inside the container, Windows resources appear at stable Linux paths:
 
 - GT450 images: `/data/gt450-images`
 - scanner inventories: `/data/scanner-inventories`
-- label-check batches: `/data/label-check-batches`
+- Label-Check pipeline batches: `/data/inslide-batches`
 - deidentified transfer staging: `/data/image-staging`
 - CoPath clone: `/data/copath-clone`
 - persistent application state: `/data/state`
@@ -212,12 +212,12 @@ Inside the container, Windows resources appear at stable Linux paths:
 Persisted UNC GT450 paths and `D:\label_check_batches` paths are translated to
 these mounts. New pipeline output records Linux mount paths directly.
 
-The GT450 mount is the named Docker volume `label-check-gt450-images`. It mounts
+The GT450 mount is the named Docker volume `inslide-gt450-images`. It mounts
 `//chp.clarian.org/app/Philips_Slide_Images/GT450_Images` through CIFS with
 read-only permissions. The remaining paths are ordinary Windows bind mounts.
 
 Create and share `IMAGE_STAGING_HOST` (normally `D:\image_staging`) with Docker
-Desktop. Before each TQ upload, Label-Check copies selected GT450 slides to
+Desktop. Before each TQ upload, InSlide copies selected GT450 slides to
 `<IMAGE_STAGING_HOST>\<destination directory>\<renamed slide>.svs`, removes the
 identifying label and macro from those copies, then gives the staged slide paths
 and a generated metadata CSV to TQ. Each transfer uploads that CSV as
@@ -234,9 +234,9 @@ Docker Desktop service account.
 
 CoPath queries are delegated to a worker that you start after signing into
 Windows. Docker and the worker communicate only through
-`LABEL_CHECK_STATE_HOST\copath-query`; no SQL credentials enter the container.
+`INSLIDE_STATE_HOST\copath-query`; no SQL credentials enter the container.
 The queue contains accessions and report data. Restrict the entire
-`LABEL_CHECK_STATE_HOST` directory to the signed-in Windows account, the Docker
+`INSLIDE_STATE_HOST` directory to the signed-in Windows account, the Docker
 Desktop service account, and administrators. Do not share it broadly or use a
 world-writable network directory.
 
@@ -267,7 +267,7 @@ batch:
 
 ```powershell
 .\.venv-copath-worker\Scripts\python.exe src\copath_windows_worker.py `
-  --queue "$env:LABEL_CHECK_STATE_HOST\copath-query" `
+  --queue "$env:INSLIDE_STATE_HOST\copath-query" `
   --connection-string-file "$env:COPATH_CONNECTION_STRING_FILE_HOST"
 ```
 
@@ -313,24 +313,24 @@ docker compose up -d
 docker compose ps
 ```
 
-Set `LABEL_CHECK_HOSTNAME` in `.env` to the machine's existing network hostname.
+Set `INSLIDE_HOSTNAME` in `.env` to the machine's existing network hostname.
 After the first startup, export Caddy's root CA certificate to the current
 user's Downloads directory:
 
 ```powershell
 docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt `
-  "$env:USERPROFILE\Downloads\label-check-local-ca.crt"
+  "$env:USERPROFILE\Downloads\inslide-local-ca.crt"
 ```
 
 On the host and each authorized coworker's Windows device, import
-`label-check-local-ca.crt` into **Trusted Root Certification Authorities** for
+`inslide-local-ca.crt` into **Trusted Root Certification Authorities** for
 the current user. Treat the certificate as trusted software and distribute it
 through an authenticated channel. Do not distribute anything else from the
 Caddy data volume, especially `root.key`.
 
 ```powershell
 Import-Certificate `
-  -FilePath "$env:USERPROFILE\Downloads\label-check-local-ca.crt" `
+  -FilePath "$env:USERPROFILE\Downloads\inslide-local-ca.crt" `
   -CertStoreLocation Cert:\CurrentUser\Root
 ```
 
@@ -341,13 +341,13 @@ Confirm that the hostname resolves to the Docker host and that HTTPS is
 reachable, then open the app:
 
 ```powershell
-$labelCheckHostname = "replace-with-configured-hostname"
-Resolve-DnsName $labelCheckHostname
-Test-NetConnection $labelCheckHostname -Port 443
-Start-Process "https://$labelCheckHostname"
+$inSlideHostname = "replace-with-configured-hostname"
+Resolve-DnsName $inSlideHostname
+Test-NetConnection $inSlideHostname -Port 443
+Start-Process "https://$inSlideHostname"
 ```
 
-Use the exact hostname configured in `LABEL_CHECK_HOSTNAME`; an IP address or a
+Use the exact hostname configured in `INSLIDE_HOSTNAME`; an IP address or a
 different alias will fail certificate validation. Port 80 is intentionally not
 published, so include `https://` in the URL. If name resolution or inbound port
 443 is blocked, ask IT to add the hostname/firewall allowance. Application port
@@ -357,20 +357,20 @@ Verify that the SMB mount contains the expected scanner directories and is
 read-only for the application user:
 
 ```powershell
-docker compose exec label-check ls -la /data/gt450-images
-docker inspect $(docker compose ps -q label-check) `
+docker compose exec inslide ls -la /data/gt450-images
+docker inspect $(docker compose ps -q inslide) `
   --format '{{range .Mounts}}{{if eq .Destination "/data/gt450-images"}}{{println "RW:" .RW "Name:" .Name}}{{end}}{{end}}'
 ```
 
 The inspection output must report `RW: false` and
-`Name: label-check-gt450-images`.
+`Name: inslide-gt450-images`.
 
 Docker volume options are fixed when the volume is created. After changing the
 SMB password or any `GT450_SMB_*` mount setting, recreate only this mount:
 
 ```powershell
 docker compose down
-docker volume rm label-check-gt450-images
+docker volume rm inslide-gt450-images
 docker compose up -d
 ```
 
@@ -381,13 +381,13 @@ The default command initializes persistent state and starts Waitress on port
 5000. Other applications use the same image:
 
 ```powershell
-docker compose run --rm label-check pipeline `
+docker compose run --rm inslide pipeline `
   --input-dir /data/gt450-images/SS12797 `
-  --output-dir /data/label-check-batches/SS12797/2026-07-31 `
+  --output-dir /data/inslide-batches/SS12797/2026-07-31 `
   --end-at name --ocr-use-cpu
 
-docker compose run --rm label-check nightly
-docker compose run --rm label-check python /app/src/deidentify_anonymize.py --help
+docker compose run --rm inslide nightly
+docker compose run --rm inslide python /app/src/deidentify_anonymize.py --help
 ```
 
 Schedule `nightly` externally; it performs one cycle and exits. State, SDL,
@@ -399,12 +399,12 @@ backups, TQ configuration, and transfer logs survive container replacement.
   account credentials and domain, SMB 3.0 connectivity, and access to the
   `app` share. Docker should fail container startup on a mount error instead of
   substituting an empty local directory. After changing mount options, remove
-  and recreate `label-check-gt450-images` as described above.
+  and recreate `inslide-gt450-images` as described above.
 
 ### CoPath troubleshooting
 
 - **Worker offline:** confirm the worker console is still running and that both
-  Windows and Docker can access `LABEL_CHECK_STATE_HOST\copath-query`. Check the
+  Windows and Docker can access `INSLIDE_STATE_HOST\copath-query`. Check the
   Windows clock if `worker.json` is present but considered stale.
 - **Query timeout:** the default is 300 seconds. Inspect the worker console and
   SQL connectivity before increasing `COPATH_QUERY_TIMEOUT_SECONDS`.
@@ -425,9 +425,9 @@ direct-mode override:
 
 ```powershell
 docker compose -f compose.yaml -f compose.direct.yaml up -d
-docker compose -f compose.yaml -f compose.direct.yaml exec label-check `
+docker compose -f compose.yaml -f compose.direct.yaml exec inslide `
   kinit YOUR_USERNAME@YOUR.AD.REALM
-docker compose -f compose.yaml -f compose.direct.yaml exec label-check klist
+docker compose -f compose.yaml -f compose.direct.yaml exec inslide klist
 ```
 
 In direct mode, use the SQL Server DNS name associated with its `MSSQLSvc`

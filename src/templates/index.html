@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Label Check</title>
+    <title>InSlide</title>
     <style nonce="{{ csp_nonce() }}">
         :root {
             --primary-color: #007bff;
@@ -201,7 +201,7 @@
 <body>
 {% include '_app_sidebar.html' %}
     <header class="header">
-        <h1>Label Check</h1>
+        <h1>InSlide</h1>
         <div class="header-links">
             {% if current_user.is_admin %}
                 <a href="{{ url_for('users_management') }}">User Management</a>

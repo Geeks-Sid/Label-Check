@@ -191,9 +191,9 @@ class Config:
     SCANNER_INVENTORIES = os.environ.get(
         "SCANNER_INVENTORIES", "D:\\scanner_inventories"
     )
-    # Path to batches of new slides to label-check
-    LABEL_CHECK_BATCHES = os.environ.get(
-        "LABEL_CHECK_BATCHES", "D:\\label_check_batches"
+    # Path to batches of new slides to process in InSlide
+    INSLIDE_BATCHES = os.environ.get(
+        "INSLIDE_BATCHES", "D:\\label_check_batches"
     )
     COPATH_CLONE = os.environ.get("COPATH_CLONE", "D:\\copath_clone")
 
@@ -221,7 +221,7 @@ def _set_private_mode(path: Path, expected_mode: int) -> bool:
         os.chmod(path, expected_mode)
         return True
     except PermissionError:
-        containerized = os.environ.get("LABEL_CHECK_CONTAINER", "false").lower() == "true"
+        containerized = os.environ.get("INSLIDE_CONTAINER", "false").lower() == "true"
         required_access = os.R_OK | os.W_OK
         if path.is_dir():
             required_access |= os.X_OK
@@ -1044,7 +1044,7 @@ class StatisticsStore:
 
 
 api_store = APIStore(Config.API_DB_PATH, Config.API_JOB_OUTPUT_DIR)
-if os.environ.get("LABEL_CHECK_STATS_SCHEDULER") != "true":
+if os.environ.get("INSLIDE_STATS_SCHEDULER") != "true":
     api_store.mark_stale_jobs_interrupted()
 stats_store = StatisticsStore(Config.STATS_DB_PATH, Config.USER_STATS_ROOT)
 
@@ -1631,7 +1631,7 @@ _longitudinal_lock = threading.Lock()
 
 
 def _batch_relative_path(root: Path) -> str:
-    return normalize_relative_path(root.relative_to(Path(Config.LABEL_CHECK_BATCHES)).as_posix())
+    return normalize_relative_path(root.relative_to(Path(Config.INSLIDE_BATCHES)).as_posix())
 
 
 def _reconcile_queue_rows(public_id: str, slide_rows: Sequence[Dict[str, str]]) -> None:
@@ -1659,7 +1659,7 @@ def _reconcile_queue_rows(public_id: str, slide_rows: Sequence[Dict[str, str]]) 
 
 def reconcile_batch_catalog() -> List[str]:
     """Refresh catalog from batch directory; never read legacy stage/queue files."""
-    base = Path(Config.LABEL_CHECK_BATCHES)
+    base = Path(Config.INSLIDE_BATCHES)
     warnings: List[str] = []
     seen: List[str] = []
     try:
@@ -1668,7 +1668,7 @@ def reconcile_batch_catalog() -> List[str]:
             key=lambda path: path.name.lower(),
         )
     except OSError as exc:
-        app.logger.warning("Label-check batch directory unavailable: %s", exc)
+        app.logger.warning("Label-Check pipeline batch directory unavailable: %s", exc)
         return [f"Batch directory is unavailable: {base}"]
 
     candidates: List[Path] = []
@@ -1798,7 +1798,7 @@ def _catalog_reconciler() -> None:
 
 def _ensure_catalog_reconciled() -> List[str]:
     global _catalog_reconciled_target, _catalog_reconciler_started
-    target = (str(Path(Config.INSTANCE_DIR)), str(Path(Config.LABEL_CHECK_BATCHES)))
+    target = (str(Path(Config.INSTANCE_DIR)), str(Path(Config.INSLIDE_BATCHES)))
     warnings: List[str] = []
     with _catalog_reconcile_lock:
         if _catalog_reconciled_target != target:
@@ -1836,7 +1836,7 @@ def discover_batches() -> Tuple[List[BatchContext], List[str]]:
     for row in batch_catalog.list_batches(Config.INSTANCE_DIR):
         if row["validity"] != "ready":
             continue
-        root = Path(Config.LABEL_CHECK_BATCHES) / Path(row["relative_path"])
+        root = Path(Config.INSLIDE_BATCHES) / Path(row["relative_path"])
         batch_id = str(row["public_id"])
         with batch_contexts_lock:
             context = batch_contexts.get(batch_id)
@@ -1918,7 +1918,7 @@ def _start_longitudinal_job(context: BatchContext, *, force: bool = False) -> bo
                 renaming.stage_longitudinal_history(
                     context.root,
                     Path(Config.COPATH_CLONE),
-                    Path(Config.LABEL_CHECK_BATCHES),
+                    Path(Config.INSLIDE_BATCHES),
                 )
             mapping_path = context.root / "name_mapping.csv"
             if mapping_path.exists():
@@ -1972,7 +1972,7 @@ def _start_renaming_job(
                     renaming.retry_group(
                         context.root,
                         Path(Config.COPATH_CLONE),
-                        Path(Config.LABEL_CHECK_BATCHES),
+                        Path(Config.INSLIDE_BATCHES),
                         old_accession,
                         new_accession,
                     )
@@ -1983,7 +1983,7 @@ def _start_renaming_job(
                     renaming.prepare_batch(
                         context.root,
                         Path(Config.COPATH_CLONE),
-                        Path(Config.LABEL_CHECK_BATCHES),
+                        Path(Config.INSLIDE_BATCHES),
                     )
             state = {"status": "ready", "error": ""}
         except Exception as exc:
@@ -3057,7 +3057,7 @@ def _tq_transfer_log_root() -> Path:
     return (
         Path(configured).expanduser()
         if configured
-        else Path(Config.LABEL_CHECK_BATCHES) / "transfer_logs"
+        else Path(Config.INSLIDE_BATCHES) / "transfer_logs"
     )
 
 
@@ -4479,7 +4479,7 @@ def admin_required(view):
 def _api_problem(status: int, code: str, title: str, detail: str):
     response = jsonify(
         {
-            "type": f"https://label-check.invalid/problems/{code}",
+            "type": f"https://inslide.invalid/problems/{code}",
             "status": status,
             "code": code,
             "title": title,
@@ -4490,7 +4490,7 @@ def _api_problem(status: int, code: str, title: str, detail: str):
     response.status_code = status
     response.content_type = "application/problem+json"
     if status == 401:
-        response.headers["WWW-Authenticate"] = 'Bearer realm="label-check-api"'
+        response.headers["WWW-Authenticate"] = 'Bearer realm="inslide-api"'
     return response
 
 
@@ -5275,7 +5275,7 @@ def renaming_page():
     try:
         with _renaming_clone_lock:
             renaming.repair_staged_pid_assignments(
-                Path(Config.COPATH_CLONE), Path(Config.LABEL_CHECK_BATCHES)
+                Path(Config.COPATH_CLONE), Path(Config.INSLIDE_BATCHES)
             )
             _, rows = renaming.read_csv(mapping_path)
             reports = renaming.report_rows(context.root, Path(Config.COPATH_CLONE))
@@ -5439,7 +5439,7 @@ def renaming_pid(batch_id: str):
             pid = renaming.pid_after_organ_change(
                 context.root,
                 Path(Config.COPATH_CLONE),
-                Path(Config.LABEL_CHECK_BATCHES),
+                Path(Config.INSLIDE_BATCHES),
                 accession,
                 organ,
                 reserved_pids,
@@ -5507,7 +5507,7 @@ def renaming_approve(batch_id: str):
                     "The mapping changed in another session; reload and try again"
                 )
             renaming.repair_staged_pid_assignments(
-                Path(Config.COPATH_CLONE), Path(Config.LABEL_CHECK_BATCHES)
+                Path(Config.COPATH_CLONE), Path(Config.INSLIDE_BATCHES)
             )
             _, current_rows = renaming.read_csv(mapping_path)
             repaired_signature = renaming.mapping_signature(current_rows)
@@ -5537,7 +5537,7 @@ def renaming_approve(batch_id: str):
                 values["PID"] = renaming.pid_after_organ_change(
                     context.root,
                     Path(Config.COPATH_CLONE),
-                    Path(Config.LABEL_CHECK_BATCHES),
+                    Path(Config.INSLIDE_BATCHES),
                     old_accession,
                     values["Organ"],
                 )

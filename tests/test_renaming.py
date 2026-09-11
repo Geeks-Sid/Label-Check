@@ -669,12 +669,12 @@ class RenamingPageTests(unittest.TestCase):
             ["accession_id", "mrn", "final_diagnosis"],
             [{"accession_id": "NP25-100", "mrn": "MRN1", "final_diagnosis": "Diagnosis text"}],
         )
-        self.old_batch_base = app_module.Config.LABEL_CHECK_BATCHES
+        self.old_batch_base = app_module.Config.INSLIDE_BATCHES
         self.old_clone = app_module.Config.COPATH_CLONE
         self.old_instance = app_module.Config.INSTANCE_DIR
         self.old_sdl = app_module.Config.SDL_FILE_PATH
         self.old_users = app_module.user_manager.users.copy()
-        app_module.Config.LABEL_CHECK_BATCHES = str(self.batch_base)
+        app_module.Config.INSLIDE_BATCHES = str(self.batch_base)
         app_module.Config.COPATH_CLONE = str(self.clone)
         app_module.Config.INSTANCE_DIR = str(self.root / "instance")
         app_module.Config.SDL_FILE_PATH = str(self.root / "Slide_Digitization_Log.xlsx")
@@ -735,7 +735,7 @@ class RenamingPageTests(unittest.TestCase):
         return data
 
     def tearDown(self):
-        app_module.Config.LABEL_CHECK_BATCHES = self.old_batch_base
+        app_module.Config.INSLIDE_BATCHES = self.old_batch_base
         app_module.Config.COPATH_CLONE = self.old_clone
         app_module.Config.INSTANCE_DIR = self.old_instance
         app_module.Config.SDL_FILE_PATH = self.old_sdl

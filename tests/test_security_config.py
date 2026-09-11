@@ -49,24 +49,24 @@ class SecurityConfigurationTests(unittest.TestCase):
         caddyfile = (SRC_DIR.parent / "container" / "caddy" / "Caddyfile").read_text(
             encoding="utf-8"
         )
-        label_check_service = compose.split("  label-check:", 1)[1].split(
+        inslide_service = compose.split("  inslide:", 1)[1].split(
             "\n  caddy:", 1
         )[0]
         caddy_service = compose.split("  caddy:", 1)[1].split("\nvolumes:", 1)[0]
 
         self.assertNotIn('"127.0.0.1:${HOST_PORT:-5000}:5000"', compose)
-        self.assertNotIn("ports:", label_check_service)
-        self.assertIn('expose:\n      - "5000"', label_check_service)
+        self.assertNotIn("ports:", inslide_service)
+        self.assertIn('expose:\n      - "5000"', inslide_service)
         self.assertIn('- "443:443"', caddy_service)
         self.assertIn(
-            "LABEL_CHECK_HOSTNAME: ${LABEL_CHECK_HOSTNAME:?Set LABEL_CHECK_HOSTNAME}",
+            "INSLIDE_HOSTNAME: ${INSLIDE_HOSTNAME:?Set INSLIDE_HOSTNAME}",
             caddy_service,
         )
         self.assertIn("condition: service_healthy", compose)
-        self.assertIn("label-check-caddy-data", compose)
-        self.assertIn("https://{$LABEL_CHECK_HOSTNAME}", caddyfile)
+        self.assertIn("inslide-caddy-data", compose)
+        self.assertIn("https://{$INSLIDE_HOSTNAME}", caddyfile)
         self.assertIn("tls internal", caddyfile)
-        self.assertIn("reverse_proxy label-check:5000", caddyfile)
+        self.assertIn("reverse_proxy inslide:5000", caddyfile)
 
     def test_missing_and_short_credentials_are_rejected_without_values(self):
         cases = [
@@ -180,14 +180,14 @@ class SecurityConfigurationTests(unittest.TestCase):
             path.touch()
             permission_error = PermissionError(1, "Operation not permitted", str(path))
             with (
-                mock.patch.dict(os.environ, {"LABEL_CHECK_CONTAINER": "true"}),
+                mock.patch.dict(os.environ, {"INSLIDE_CONTAINER": "true"}),
                 mock.patch.object(os, "chmod", side_effect=permission_error),
                 mock.patch.object(os, "access", return_value=True),
             ):
                 self.assertFalse(app_module._set_private_mode(path, 0o600))
 
             with (
-                mock.patch.dict(os.environ, {"LABEL_CHECK_CONTAINER": "false"}),
+                mock.patch.dict(os.environ, {"INSLIDE_CONTAINER": "false"}),
                 mock.patch.object(os, "chmod", side_effect=permission_error),
             ):
                 with self.assertRaises(PermissionError):
@@ -337,7 +337,7 @@ class SecurityConfigurationTests(unittest.TestCase):
 
     def test_browser_security_headers_and_csp_nonces(self):
         response = app_module.app.test_client().get(
-            "/login", base_url="https://label-check.example"
+            "/login", base_url="https://inslide.example"
         )
 
         policy = response.headers["Content-Security-Policy"]
@@ -369,7 +369,7 @@ class SecurityConfigurationTests(unittest.TestCase):
             secure_response = app_module.app.test_client().post(
                 "/login",
                 data={"username": user.id, "password": "valid-password-123"},
-                base_url="https://label-check.example",
+                base_url="https://inslide.example",
             )
             secure_cookie = secure_response.headers["Set-Cookie"]
             self.assertIn("Secure", secure_cookie)

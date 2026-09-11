@@ -38,16 +38,16 @@ class CompletedStagesTests(unittest.TestCase):
                 }
             )
 
-        self.old_batch_base = qc_app.Config.LABEL_CHECK_BATCHES
+        self.old_batch_base = qc_app.Config.INSLIDE_BATCHES
         self.old_instance_dir = qc_app.Config.INSTANCE_DIR
-        qc_app.Config.LABEL_CHECK_BATCHES = str(self.batch_base)
+        qc_app.Config.INSLIDE_BATCHES = str(self.batch_base)
         qc_app.Config.INSTANCE_DIR = str(self.root / "instance")
         qc_app.batch_contexts.clear()
         qc_app.app.config.update(TESTING=True, SECRET_KEY="completed-stages-test")
 
     def tearDown(self):
         qc_app.batch_contexts.clear()
-        qc_app.Config.LABEL_CHECK_BATCHES = self.old_batch_base
+        qc_app.Config.INSLIDE_BATCHES = self.old_batch_base
         qc_app.Config.INSTANCE_DIR = self.old_instance_dir
         self.temp_dir.cleanup()
 

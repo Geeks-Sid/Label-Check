@@ -316,13 +316,13 @@ class QCStatisticsIntegrationTests(unittest.TestCase):
                 }
             )
         self.old_values = {
-            "LABEL_CHECK_BATCHES": app_module.Config.LABEL_CHECK_BATCHES,
+            "INSLIDE_BATCHES": app_module.Config.INSLIDE_BATCHES,
             "INSTANCE_DIR": app_module.Config.INSTANCE_DIR,
             "BACKUP_DIR": app_module.Config.BACKUP_DIR,
         }
         self.old_users = app_module.user_manager.users.copy()
         self.old_stats_configuration = (app_module.stats_store.db_path, app_module.stats_store.user_root)
-        app_module.Config.LABEL_CHECK_BATCHES = str(self.batch_base)
+        app_module.Config.INSLIDE_BATCHES = str(self.batch_base)
         app_module.Config.INSTANCE_DIR = str(self.root / "instance")
         app_module.Config.BACKUP_DIR = str(self.root / "backups")
         app_module.stats_store.configure(str(self.root / "statistics.sqlite3"), str(self.root / "users"))

@@ -76,7 +76,7 @@
   },
   "components": {
     "securitySchemes": {
-      "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "Label-Check PAT"}
+      "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "InSlide PAT"}
     },
     "parameters": {
       "IdempotencyKey": {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 128}},

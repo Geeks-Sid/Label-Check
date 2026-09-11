@@ -6,7 +6,7 @@ import logging
 import os
 import time
 
-os.environ["LABEL_CHECK_STATS_SCHEDULER"] = "true"
+os.environ["INSLIDE_STATS_SCHEDULER"] = "true"
 
 import app as app_module
 

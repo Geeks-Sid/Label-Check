@@ -101,7 +101,7 @@ class BatchCatalogMigrationTests(unittest.TestCase):
             [{"QC": "True", "Renamed": "False"}],
         )
         queue_name = migrate_batch_catalog.legacy_queue_name(
-            "/data/label-check-batches", "SS100/batch-1"
+            "/data/inslide-batches", "SS100/batch-1"
         )
         self.queue = self.state / "instance" / "batch_queues" / queue_name
         write_csv(

@@ -227,13 +227,13 @@ def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument(
         "--batches-root", type=Path,
-        default=Path(os.environ.get("LABEL_CHECK_BATCHES_HOST") or os.environ.get("LABEL_CHECK_BATCHES", r"D:\label_check_batches")),
+        default=Path(os.environ.get("INSLIDE_BATCHES_HOST") or os.environ.get("INSLIDE_BATCHES", r"D:\label_check_batches")),
     )
     result.add_argument(
         "--state-root", type=Path,
-        default=Path(os.environ.get("LABEL_CHECK_STATE_HOST", r"D:\label_check_batches\state")),
+        default=Path(os.environ.get("INSLIDE_STATE_HOST", r"D:\label_check_batches\state")),
     )
-    result.add_argument("--legacy-runtime-batches-root", default="/data/label-check-batches")
+    result.add_argument("--legacy-runtime-batches-root", default="/data/inslide-batches")
     result.add_argument("--apply", action="store_true", help="write database and archive imported files")
     result.add_argument("--replace", action="store_true", help="replace an existing catalog")
     return result

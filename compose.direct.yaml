@@ -1,10 +1,10 @@
 services:
-  label-check:
+  inslide:
     environment:
       COPATH_QUERY_MODE: direct
       COPATH_CONNECTION_STRING_FILE: /run/secrets/copath_connection_string
       KRB5_CONFIG: /etc/krb5.conf
-      KRB5CCNAME: /tmp/krb5cc_labelcheck
+      KRB5CCNAME: /tmp/krb5cc_inslide
     volumes:
       - type: bind
         source: ${KRB5_CONFIG_HOST:?Set KRB5_CONFIG_HOST to the domain Kerberos configuration file}

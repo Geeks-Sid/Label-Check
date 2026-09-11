@@ -1,7 +1,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='app_shell.css') }}">
 <aside class="app-sidebar" aria-label="Application navigation">
     <div class="app-sidebar-brand">
-        <a href="{{ url_for('index') }}" title="Label Check"><span class="nav-icon">LC</span><span class="nav-label">Label Check</span></a>
+        <a href="{{ url_for('index') }}" title="InSlide"><span class="nav-icon">IS</span><span class="nav-label">InSlide</span></a>
         <button id="sidebar-toggle" type="button" aria-label="Collapse navigation" aria-expanded="true">‹</button>
     </div>
     <nav>
@@ -27,14 +27,14 @@
     const sidebar = document.querySelector('.app-sidebar');
     const toggle = document.getElementById('sidebar-toggle');
     body.classList.add('app-shell-page');
-    const collapsed = localStorage.getItem('label-check-sidebar-collapsed') === 'true';
+    const collapsed = localStorage.getItem('inslide-sidebar-collapsed') === 'true';
     body.classList.toggle('sidebar-collapsed', collapsed);
     toggle.setAttribute('aria-expanded', String(!collapsed));
     toggle.textContent = collapsed ? '›' : '‹';
     toggle.addEventListener('click', () => {
         const next = !body.classList.contains('sidebar-collapsed');
         body.classList.toggle('sidebar-collapsed', next);
-        localStorage.setItem('label-check-sidebar-collapsed', String(next));
+        localStorage.setItem('inslide-sidebar-collapsed', String(next));
         toggle.setAttribute('aria-expanded', String(!next));
         toggle.textContent = next ? '›' : '‹';
     });
