@@ -43,6 +43,7 @@ import time
 import tomllib
 import uuid
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
 from pathlib import Path, PureWindowsPath
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
@@ -2928,9 +2929,18 @@ TQ_FILTER_FIELDS = (
 _tq_pid_pattern = re.compile(r"^[A-Z]{6}$")
 _tq_section_pattern = re.compile(r"^[0-9]{3}$")
 _tq_state_lock = threading.Lock()
+_tq_config_lock = threading.Lock()
 _tq_drafts: Dict[str, Dict[str, Any]] = {}
 _tq_jobs: Dict[str, "TQJob"] = {}
 _tq_active_job_id: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class TQConfigResult:
+    values: Dict[str, Any]
+    repaired_lines: Tuple[int, ...] = ()
+    repaired_keys: Tuple[str, ...] = ()
+    backup_path: Optional[Path] = None
 
 
 class TQJob:
@@ -2958,6 +2968,7 @@ class TQJob:
         self.result_errors: Dict[str, str] = {}
         self.started_at = datetime.datetime.now().astimezone()
         self.log_path: Optional[Path] = None
+        self.config_result: Optional[TQConfigResult] = None
 
 
 def _tq_append_output(job: TQJob, message: str) -> None:
@@ -3446,15 +3457,123 @@ def _tq_destination_dir(prefix: str, slide: Dict[str, str]) -> str:
     return f"{_tq_safe_prefix(prefix)}/{slide['organ']}/{slide['pid']}"
 
 
-def _tq_config() -> Dict[str, Any]:
-    path = Path(Config.TQ_HOME_DIR).expanduser() / "config.toml"
+_TQ_LOCAL_PATH_ASSIGNMENT = re.compile(
+    r'^(?P<prefix>\s*(?P<key>source|destination)\s*=\s*)"'
+    r'(?P<value>.*)"(?P<suffix>\s*(?:#.*)?)$'
+)
+
+
+def _tq_windows_path_is_unambiguously_literal(value: str) -> bool:
+    if '"' in value or any(character in value for character in "\r\n\0"):
+        return False
+    runs = [len(match.group()) for match in re.finditer(r"\\+", value)]
+    if re.match(r"^[A-Za-z]:\\", value):
+        return bool(runs) and all(length == 1 for length in runs)
+    if re.match(r"^\\\\[^\\]", value):
+        return runs[:1] == [2] and all(length == 1 for length in runs[1:])
+    return False
+
+
+def _tq_windows_path_is_correctly_escaped(value: str) -> bool:
+    runs = [len(match.group()) for match in re.finditer(r"\\+", value)]
+    if re.match(r"^[A-Za-z]:\\", value):
+        return bool(runs) and all(length == 2 for length in runs)
+    if re.match(r"^\\\\", value):
+        return runs[:1] == [4] and all(length == 2 for length in runs[1:])
+    return False
+
+
+def _tq_literal_path(value: str) -> str:
+    if "'" not in value:
+        return f"'{value}'"
+    return '"' + value.replace("\\", "\\\\") + '"'
+
+
+def _tq_repair_windows_paths(
+    contents: str,
+) -> Tuple[str, Tuple[Tuple[int, str], ...]]:
+    lines = contents.splitlines(keepends=True)
+    section = ""
+    repairs: List[Tuple[int, str]] = []
+    for index, original in enumerate(lines):
+        newline = ""
+        line = original
+        if line.endswith("\n"):
+            newline = "\n"
+            line = line[:-1]
+            if line.endswith("\r"):
+                line = line[:-1]
+                newline = "\r\n"
+        header = re.match(r"^\s*\[([^]]+)]\s*(?:#.*)?$", line)
+        if header:
+            section = header.group(1).strip()
+            continue
+        match = _TQ_LOCAL_PATH_ASSIGNMENT.match(line)
+        if not match:
+            continue
+        key = match.group("key")
+        if (key, section) not in {("source", "pusher"), ("destination", "puller")}:
+            continue
+        value = match.group("value")
+        looks_like_windows_path = bool(
+            re.match(r"^(?:[A-Za-z]:\\|\\\\)", value)
+        )
+        if not looks_like_windows_path:
+            continue
+        if not _tq_windows_path_is_unambiguously_literal(value):
+            if _tq_windows_path_is_correctly_escaped(value):
+                continue
+            column = line.find("\\", match.start("value")) + 1
+            raise TQError(
+                f"TQ configuration line {index + 1}, column {column} uses "
+                f"ambiguous mixed backslash escaping in {key!r}. Use a "
+                "single-quoted Windows path or double every backslash. "
+                "An administrator can correct it at /tq/config."
+            )
+        lines[index] = (
+            match.group("prefix")
+            + _tq_literal_path(value)
+            + match.group("suffix")
+            + newline
+        )
+        repairs.append((index + 1, key))
+    return "".join(lines), tuple(repairs)
+
+
+def _tq_toml_error(contents: str, exc: tomllib.TOMLDecodeError) -> TQError:
+    detail = str(exc)
+    location = re.search(r"\(at line (\d+), column (\d+)\)$", detail)
+    if not location:
+        return TQError(f"TQ configuration is not valid TOML: {detail}")
+    line_number = int(location.group(1))
+    column = int(location.group(2))
+    lines = contents.splitlines()
+    excerpt = (
+        lines[line_number - 1].strip()[:160]
+        if line_number <= len(lines)
+        else ""
+    )
+    hint = ""
+    if "Unescaped '\\' in a string" in detail:
+        hint = (
+            " Windows paths must use single quotes, such as "
+            "source = 'D:\\folder', or double each backslash."
+        )
+    return TQError(
+        f"TQ configuration line {line_number}, column {column} is invalid: "
+        f"{detail}. Source: {excerpt!r}.{hint} "
+        "An administrator can correct it at /tq/config."
+    )
+
+
+def _tq_parse_config(
+    contents: str,
+) -> Tuple[Dict[str, Any], str, Tuple[Tuple[int, str], ...]]:
+    repaired, repairs = _tq_repair_windows_paths(contents)
     try:
-        with path.open("rb") as handle:
-            values = tomllib.load(handle)
-    except FileNotFoundError as exc:
-        raise TQError(f"TQ configuration was not found at {path}.") from exc
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        raise TQError(f"TQ configuration could not be read: {exc}") from exc
+        values = tomllib.loads(repaired)
+    except tomllib.TOMLDecodeError as exc:
+        raise _tq_toml_error(repaired, exc) from exc
     missing = [
         key for key in ("username", "ftp_addr", "ftp_dir")
         if not str(values.get(key, "")).strip()
@@ -3463,7 +3582,84 @@ def _tq_config() -> Dict[str, Any]:
         raise TQError(
             f"TQ configuration requires values for: {', '.join(missing)}."
         )
-    return values
+    return values, repaired, repairs
+
+
+def _tq_backup_name(target: Path) -> Path:
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime(
+        "%Y%m%dT%H%M%S%fZ"
+    )
+    return target.with_name(f"{target.name}.bak-{timestamp}")
+
+
+def _tq_replace_config(
+    target: Path,
+    contents: str,
+    backup_contents: Optional[str] = None,
+) -> Optional[Path]:
+    root = target.parent
+    root.mkdir(parents=True, exist_ok=True)
+    if target.is_symlink():
+        raise TQError("config.toml cannot be edited through a symbolic link.")
+    mode = stat.S_IMODE(target.stat().st_mode) if target.exists() else None
+    backup_path = None
+    if backup_contents is not None:
+        backup_path = _tq_backup_name(target)
+        try:
+            descriptor = os.open(
+                backup_path,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                mode if mode is not None else PRIVATE_FILE_MODE,
+            )
+            with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
+                handle.write(backup_contents)
+                handle.flush()
+                os.fsync(handle.fileno())
+            if mode is not None:
+                os.chmod(backup_path, mode)
+        except Exception:
+            backup_path.unlink(missing_ok=True)
+            raise
+    descriptor, temporary_path = tempfile.mkstemp(
+        prefix=".config.", suffix=".toml.tmp", dir=root
+    )
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
+            handle.write(contents)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if mode is not None:
+            os.chmod(temporary_path, mode)
+        os.replace(temporary_path, target)
+    finally:
+        if os.path.exists(temporary_path):
+            os.remove(temporary_path)
+    return backup_path
+
+
+def _tq_config() -> TQConfigResult:
+    path = Path(Config.TQ_HOME_DIR).expanduser() / "config.toml"
+    with _tq_config_lock:
+        try:
+            if path.is_symlink():
+                raise TQError("config.toml cannot be opened through a symbolic link.")
+            contents = path.read_text(encoding="utf-8")
+            values, repaired, repairs = _tq_parse_config(contents)
+            backup_path = None
+            if repairs:
+                backup_path = _tq_replace_config(path, repaired, contents)
+        except FileNotFoundError as exc:
+            raise TQError(f"TQ configuration was not found at {path}.") from exc
+        except TQError:
+            raise
+        except (OSError, UnicodeError) as exc:
+            raise TQError(f"TQ configuration could not be read: {exc}") from exc
+    return TQConfigResult(
+        values=values,
+        repaired_lines=tuple(line for line, _ in repairs),
+        repaired_keys=tuple(key for _, key in repairs),
+        backup_path=backup_path,
+    )
 
 
 def _tq_write_metadata_csv(slides: List[Dict[str, str]]) -> Path:
@@ -3963,7 +4159,7 @@ def _start_tq_job(
     all_slides: List[Dict[str, str]],
 ) -> TQJob:
     global _tq_active_job_id
-    _tq_config()
+    config_result = _tq_config()
     _tq_prepare_staging_paths(slides)
     with _tq_state_lock:
         if _tq_active_job_id:
@@ -3978,6 +4174,7 @@ def _start_tq_job(
             slides,
             all_slides,
         )
+        job.config_result = config_result
         _tq_jobs[job.id] = job
         _tq_active_job_id = job.id
     threading.Thread(target=_run_tq_job, args=(job,), daemon=True).start()
@@ -4030,33 +4227,31 @@ def _tq_relative_path(path: Path) -> str:
     return str(path.resolve().relative_to(root)).replace(os.sep, "/")
 
 
-def _save_tq_config(contents: str) -> None:
+def _save_tq_config(contents: str) -> TQConfigResult:
     if len(contents.encode("utf-8")) > 1024 * 1024:
         raise TQError("config.toml cannot exceed 1 MiB.")
-    try:
-        tomllib.loads(contents)
-    except tomllib.TOMLDecodeError as exc:
-        raise TQError(f"config.toml is not valid TOML: {exc}") from exc
-    root = Path(Config.TQ_HOME_DIR).expanduser()
-    root.mkdir(parents=True, exist_ok=True)
-    target = root / "config.toml"
-    if target.is_symlink():
-        raise TQError("config.toml cannot be edited through a symbolic link.")
-    mode = stat.S_IMODE(target.stat().st_mode) if target.exists() else None
-    descriptor, temporary_path = tempfile.mkstemp(
-        prefix=".config.", suffix=".toml.tmp", dir=root
+    values, repaired, repairs = _tq_parse_config(contents)
+    target = Path(Config.TQ_HOME_DIR).expanduser() / "config.toml"
+    with _tq_config_lock:
+        if target.is_symlink():
+            raise TQError("config.toml cannot be edited through a symbolic link.")
+        previous = None
+        if repairs:
+            try:
+                previous = target.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                previous = contents
+            except UnicodeError as exc:
+                raise TQError(
+                    f"Existing config.toml could not be read: {exc}"
+                ) from exc
+        backup_path = _tq_replace_config(target, repaired, previous)
+    return TQConfigResult(
+        values=values,
+        repaired_lines=tuple(line for line, _ in repairs),
+        repaired_keys=tuple(key for _, key in repairs),
+        backup_path=backup_path,
     )
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
-            handle.write(contents)
-            handle.flush()
-            os.fsync(handle.fileno())
-        if mode is not None:
-            os.chmod(temporary_path, mode)
-        os.replace(temporary_path, target)
-    finally:
-        if os.path.exists(temporary_path):
-            os.remove(temporary_path)
 
 
 # ==============================================================================
@@ -5076,6 +5271,10 @@ def tq_transfer():
             slide["destination_dir"] = _tq_destination_dir(staging_dir, slide)
         job = _start_tq_job(owner_id, selected, all_slides)
     except TQError as exc:
+        app.logger.warning(
+            "TQ_TRANSFER_PREFLIGHT user_id=%s status=failed",
+            current_user.id,
+        )
         flash(str(exc), "error")
         with _tq_state_lock:
             if draft:
@@ -5085,6 +5284,22 @@ def tq_transfer():
     session["tq_job_id"] = job.id
     with _tq_state_lock:
         _tq_drafts.pop(owner_id, None)
+    config_result = getattr(job, "config_result", None)
+    if config_result and config_result.repaired_lines:
+        lines = ", ".join(str(line) for line in config_result.repaired_lines)
+        backup_name = config_result.backup_path.name
+        app.logger.info(
+            "TQ_CONFIG_REPAIR user_id=%s status=succeeded keys=%s lines=%s backup=%s",
+            current_user.id,
+            ",".join(config_result.repaired_keys),
+            lines,
+            backup_name,
+        )
+        flash(
+            f"TQ configuration Windows path escaping was repaired on line(s) "
+            f"{lines}. Original saved as {backup_name}.",
+            "success",
+        )
     flash(f"Transfer started for {len(selected)} slide(s).", "success")
     return redirect(url_for("tq_page"))
 
@@ -5187,7 +5402,7 @@ def tq_edit_config():
     if request.method == "POST":
         contents = request.form.get("config_text", "")
         try:
-            _save_tq_config(contents)
+            result = _save_tq_config(contents)
         except (TQError, OSError) as exc:
             app.logger.warning(
                 "TQ_CONFIG_UPDATE user_id=%s status=failed", current_user.id
@@ -5200,9 +5415,22 @@ def tq_edit_config():
                 messages=flash_messages(),
             )
         app.logger.info(
-            "TQ_CONFIG_UPDATE user_id=%s status=succeeded", current_user.id
+            "TQ_CONFIG_UPDATE user_id=%s status=succeeded repaired_keys=%s "
+            "repaired_lines=%s",
+            current_user.id,
+            ",".join(result.repaired_keys),
+            ",".join(str(line) for line in result.repaired_lines),
         )
-        flash("config.toml was saved successfully.", "success")
+        if result.repaired_lines:
+            lines = ", ".join(str(line) for line in result.repaired_lines)
+            backup_name = result.backup_path.name
+            flash(
+                f"Windows path escaping was repaired on line(s) {lines}. "
+                f"Original saved as {backup_name}.",
+                "success",
+            )
+        else:
+            flash("config.toml was saved successfully.", "success")
         return redirect(url_for("tq_edit_config"))
 
     try:

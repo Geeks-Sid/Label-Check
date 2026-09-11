@@ -338,6 +338,36 @@ class TQTransferTests(unittest.TestCase):
         with self.client.session_transaction() as session:
             self.assertEqual("job-id", session["tq_job_id"])
 
+    def test_transfer_preflight_repairs_config_and_reports_backup(self):
+        slides = self.catalog()
+        self.client.post("/tq/review", data={"slide_id": slides[0]["id"]})
+        malformed = (
+            'username = "operator"\n'
+            'ftp_addr = "sftp.example"\n'
+            'ftp_dir = "/transfer"\n'
+            '[pusher]\n'
+            r'source = "D:\transfer"' "\n"
+        )
+        path = self.tq_home / "config.toml"
+        path.write_text(malformed, encoding="utf-8")
+
+        with mock.patch.object(app_module.threading, "Thread"):
+            response = self.client.post(
+                "/tq/transfer",
+                data={"destination_dir": "destination"},
+                follow_redirects=True,
+            )
+
+        self.assertEqual(200, response.status_code)
+        self.assertIn(b"escaping was repaired on line(s) 5", response.data)
+        self.assertIn(b"Transfer started for 1 slide(s)", response.data)
+        self.assertIn(
+            r"source = 'D:\transfer'", path.read_text(encoding="utf-8")
+        )
+        backups = list(self.tq_home.glob("config.toml.bak-*"))
+        self.assertEqual(1, len(backups))
+        self.assertEqual(malformed, backups[0].read_text(encoding="utf-8"))
+
     def test_config_requires_all_connection_values(self):
         (self.tq_home / "config.toml").write_text(
             'username = "operator"\nftp_addr = ""\nftp_dir = "/transfer"\n',
@@ -345,6 +375,136 @@ class TQTransferTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(app_module.TQError, "ftp_addr"):
             app_module._tq_config()
+
+    def test_config_auto_repairs_unescaped_windows_paths_with_backup(self):
+        malformed = (
+            'username = "operator"\n'
+            'ftp_addr = "sftp.example"\n'
+            'ftp_dir = "/transfer"\n'
+            '[pusher]\n'
+            r'source = "D:\transfer\new"' "\n"
+            '[puller]\n'
+            r'destination = "\\server\share"' "\n"
+        )
+        path = self.tq_home / "config.toml"
+        path.write_text(malformed, encoding="utf-8")
+        path.chmod(0o640)
+
+        result = app_module._tq_config()
+
+        repaired = path.read_text(encoding="utf-8")
+        self.assertEqual((5, 7), result.repaired_lines)
+        self.assertEqual(("source", "destination"), result.repaired_keys)
+        self.assertEqual(r"D:\transfer\new", result.values["pusher"]["source"])
+        self.assertEqual(r"\\server\share", result.values["puller"]["destination"])
+        self.assertIn(r"source = 'D:\transfer\new'", repaired)
+        self.assertIn(r"destination = '\\server\share'", repaired)
+        self.assertIsNotNone(result.backup_path)
+        self.assertEqual(malformed, result.backup_path.read_text(encoding="utf-8"))
+        self.assertEqual(0o640, path.stat().st_mode & 0o777)
+        self.assertEqual(0o640, result.backup_path.stat().st_mode & 0o777)
+
+    def test_config_repairs_control_escape_and_apostrophe_path(self):
+        contents = (
+            'username = "operator"\n'
+            'ftp_addr = "sftp.example"\n'
+            'ftp_dir = "/transfer"\n'
+            '[pusher]\n'
+            r'''source = "D:\patient's\temp"''' "\n"
+        )
+
+        values, repaired, repairs = app_module._tq_parse_config(contents)
+
+        self.assertEqual(((5, "source"),), repairs)
+        self.assertEqual(r"D:\patient's\temp", values["pusher"]["source"])
+        self.assertIn(r'''source = "D:\\patient's\\temp"''', repaired)
+
+    def test_config_repairs_windows_path_with_trailing_backslash(self):
+        contents = (
+            'username = "operator"\n'
+            'ftp_addr = "sftp.example"\n'
+            'ftp_dir = "/transfer"\n'
+            '[pusher]\n'
+            + 'source = "D:\\transfer\\"\n'
+        )
+
+        values, repaired, repairs = app_module._tq_parse_config(contents)
+
+        self.assertEqual(((5, "source"),), repairs)
+        self.assertEqual("D:\\transfer\\", values["pusher"]["source"])
+        self.assertIn("source = 'D:\\transfer\\'", repaired)
+
+    def test_config_leaves_correct_or_ambiguous_escaping_untouched(self):
+        correct = (
+            'username = "operator"\n'
+            'ftp_addr = "sftp.example"\n'
+            'ftp_dir = "/transfer"\n'
+            '[pusher]\n'
+            r'source = "D:\\transfer\\new"' "\n"
+        )
+        path = self.tq_home / "config.toml"
+        path.write_text(correct, encoding="utf-8")
+
+        result = app_module._tq_config()
+
+        self.assertEqual((), result.repaired_lines)
+        self.assertEqual(correct, path.read_text(encoding="utf-8"))
+        self.assertEqual([], list(self.tq_home.glob("config.toml.bak-*")))
+
+        ambiguous = correct.replace(
+            r'D:\\transfer\\new', r'D:\\transfer\broken'
+        )
+        path.write_text(ambiguous, encoding="utf-8")
+        with self.assertRaisesRegex(
+            app_module.TQError,
+            r"line 5, column \d+.*administrator.* /tq/config",
+        ):
+            app_module._tq_config()
+        self.assertEqual(ambiguous, path.read_text(encoding="utf-8"))
+        self.assertEqual([], list(self.tq_home.glob("config.toml.bak-*")))
+
+    def test_config_auto_repair_rejects_symlink_target(self):
+        path = self.tq_home / "config.toml"
+        path.unlink()
+        outside = self.root / "outside-config.toml"
+        malformed = (
+            'username = "operator"\n'
+            'ftp_addr = "sftp.example"\n'
+            'ftp_dir = "/transfer"\n'
+            '[pusher]\n'
+            r'source = "D:\transfer"' "\n"
+        )
+        outside.write_text(malformed, encoding="utf-8")
+        path.symlink_to(outside)
+
+        with self.assertRaisesRegex(app_module.TQError, "symbolic link"):
+            app_module._tq_config()
+
+        self.assertEqual(malformed, outside.read_text(encoding="utf-8"))
+        self.assertEqual([], list(self.tq_home.glob("config.toml.bak-*")))
+
+    def test_config_replace_failure_keeps_original_and_removes_temporary_file(self):
+        malformed = (
+            'username = "operator"\n'
+            'ftp_addr = "sftp.example"\n'
+            'ftp_dir = "/transfer"\n'
+            '[pusher]\n'
+            r'source = "D:\transfer"' "\n"
+        )
+        path = self.tq_home / "config.toml"
+        path.write_text(malformed, encoding="utf-8")
+
+        with mock.patch.object(
+            app_module.os, "replace", side_effect=OSError("replace failed")
+        ):
+            with self.assertRaisesRegex(app_module.TQError, "replace failed"):
+                app_module._tq_config()
+
+        self.assertEqual(malformed, path.read_text(encoding="utf-8"))
+        self.assertEqual([], list(self.tq_home.glob(".config.*.toml.tmp")))
+        backups = list(self.tq_home.glob("config.toml.bak-*"))
+        self.assertEqual(1, len(backups))
+        self.assertEqual(malformed, backups[0].read_text(encoding="utf-8"))
 
     def test_metadata_csv_aggregates_accessions_and_uploads_last(self):
         slides = [dict(slide) for slide in self.catalog()]
@@ -711,9 +871,14 @@ class TQTransferTests(unittest.TestCase):
         self.assertIn(b"transfer complete", file_response.data)
         self.assertNotIn(b"Edit Config", root_response.data)
 
+        transfer_response = self.client.get("/tq")
+        self.assertNotIn(b"Edit Config", transfer_response.data)
+
         self.login_as(self.admin)
         admin_response = self.client.get("/tq/logs")
         self.assertIn(b"Edit Config", admin_response.data)
+        admin_transfer_response = self.client.get("/tq")
+        self.assertIn(b"Edit Config", admin_transfer_response.data)
 
     def test_config_editor_rejects_non_admin_without_changing_file(self):
         original = (self.tq_home / "config.toml").read_text(encoding="utf-8")
@@ -759,6 +924,33 @@ class TQTransferTests(unittest.TestCase):
             valid,
             (self.tq_home / "config.toml").read_text(encoding="utf-8"),
         )
+
+    def test_config_editor_repairs_windows_path_and_reports_backup(self):
+        self.login_as(self.admin)
+        original = (self.tq_home / "config.toml").read_text(encoding="utf-8")
+        malformed = (
+            'username = "operator"\n'
+            'ftp_addr = "sftp.example"\n'
+            'ftp_dir = "/transfer"\n'
+            '[pusher]\n'
+            r'source = "D:\transfer"' "\n"
+        )
+
+        response = self.client.post(
+            "/tq/config",
+            data={"config_text": malformed},
+            follow_redirects=True,
+        )
+
+        self.assertEqual(200, response.status_code)
+        self.assertIn(b"escaping was repaired on line(s) 5", response.data)
+        self.assertIn(
+            r"source = 'D:\transfer'",
+            (self.tq_home / "config.toml").read_text(encoding="utf-8"),
+        )
+        backups = list(self.tq_home.glob("config.toml.bak-*"))
+        self.assertEqual(1, len(backups))
+        self.assertEqual(original, backups[0].read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

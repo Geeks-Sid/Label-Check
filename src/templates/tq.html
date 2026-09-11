@@ -72,6 +72,9 @@
     <nav>
         <a href="{{ url_for('index') }}">Home</a>
         <a href="{{ url_for('tq_logs') }}">Show Logs</a>
+        {% if current_user.is_admin %}
+            <a href="{{ url_for('tq_edit_config') }}">Edit Config</a>
+        {% endif %}
         <span>Logged in as <b>{{ current_user.id }}</b></span>
         <a href="{{ url_for('logout') }}">Logout</a>
     </nav>

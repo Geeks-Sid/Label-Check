@@ -156,6 +156,13 @@ Only InSlide administrators can view or edit the global TQ connection
 configuration. Authenticated operators can continue transferring approved
 slides through that administrator-managed destination.
 
+Administrators can open the configuration directly from **Transfers > Edit
+Config**. The container reads `${TQ_HOME_HOST}\config.toml` through its
+`/home/inslide/.tq/config.toml` bind mount. Write Windows paths as TOML literal
+strings, for example `source = 'D:\image_staging'`. InSlide automatically
+repairs unambiguous Windows-path escaping during saves and transfer preflight;
+each repair retains a timestamped `config.toml.bak-*` copy.
+
 The GT450 CIFS password is stored in the gitignored `.env` file and in local
 Docker volume metadata. Restrict Docker access to trusted administrators and do
 not reuse a personal account. Because CIFS mount options are comma-delimited,

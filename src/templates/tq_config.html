@@ -25,6 +25,11 @@
     <section class="card">
         <h2>config.toml</h2>
         <p class="path">{{ config_path }}</p>
+        <p>
+            For Windows paths, use literal strings such as
+            <code>source = 'D:\folder'</code>. Safe path escaping errors are
+            repaired automatically and backed up.
+        </p>
         <form method="POST" action="{{ url_for('tq_edit_config') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <textarea name="config_text" aria-label="TQ configuration" spellcheck="false">{{ config_text }}</textarea>
